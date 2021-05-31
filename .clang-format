@@ -2,8 +2,8 @@
 Standard: Cpp11
 BasedOnStyle: LLVM
 
-IndentWidth: 4
-TabWidth: 4
+IndentWidth: 2
+TabWidth: 2
 AccessModifierOffset: -3
 ColumnLimit: 0
 UseTab: Never
