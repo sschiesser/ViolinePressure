@@ -6,15 +6,21 @@ void calibrate();
 void doCalibrate(uint8_t strNb);
 void measure();
 void measureInterrupts();
-void measurePDB();
 uint16_t measureString(uint8_t strNb);
 void displayString(uint16_t strVal);
 void displayHelp();
 
+#define STRING_NB 2
+#define BUFFER_SIZE 500
+
 const int strPins[] = {A0, A1};
 elapsedMicros elapsedTime;
-
 ADC* adc = new ADC(); // adc object;
+uint16_t strBuffers[STRING_NB][BUFFER_SIZE];
+uint16_t bufferCnt[] = {0xffff, 0xffff};
+uint16_t strValues[STRING_NB];
+uint8_t displayvalues[STRING_NB];
+uint16_t strRanges[STRING_NB][2] = {{UINT16_MAX, 0}, {UINT16_MAX, 0}};
 
 void setup()
 {
@@ -33,10 +39,6 @@ void setup()
   displayHelp();
 }
 
-uint16_t strValues[2];
-uint8_t displayvalues[2];
-uint16_t strRanges[2][2] = {{UINT16_MAX, 0}, {UINT16_MAX, 0}};
-
 void loop()
 {
   char c = 0;
@@ -54,10 +56,6 @@ void loop()
     else if (c == 'm')
     {
       measure();
-    }
-    else if (c == 'p')
-    {
-      measurePDB();
     }
     else if (c == 'h')
     {
@@ -201,24 +199,15 @@ void measure()
 
 void measureInterrupts()
 {
-  elapsedTime = 0;
   bool retVal = false;
   adc->adc0->enableInterrupts(adc0_isr);
+  elapsedTime = 0;
   if (!(retVal = adc->adc0->startSingleRead(strPins[0])))
   {
-    Serial.println("Error on starting single read");
+    Serial.println("Error on startSingleRead(A0)");
   }
 
   displayHelp();
-}
-
-void measurePDB()
-{
-  elapsedTime = 0;
-  adc->adc0->stopPDB();
-  adc->adc0->startSingleRead(strPins[0]);
-  adc->adc0->enableInterrupts(adc0_isr);
-  adc->adc0->startPDB(1000);
 }
 
 uint16_t measureString(uint8_t strNb)
@@ -249,6 +238,50 @@ void displayHelp()
 // If you enable interrupts make sure to call readSingle() to clear the interrupt.
 void adc0_isr()
 {
-  Serial.println(elapsedTime);
-  adc->adc0->readSingle();
+  bool retVal = false;
+  uint8_t pin = ADC::sc1a2channelADC0[ADC0_SC1A & ADC_SC1A_CHANNELS];
+  if (pin == strPins[0])
+  {
+    Serial.print(elapsedTime);
+    Serial.println(": A0");
+    uint16_t val                  = adc->adc0->readSingle();
+    strBuffers[0][bufferCnt[0]++] = val;
+    if (bufferCnt[0] == BUFFER_SIZE)
+    {
+      bufferCnt[0] = 0;
+    }
+    elapsedTime = 0;
+    if (!(retVal = adc->adc0->startSingleRead(strPins[1])))
+    {
+      Serial.println("Error on startContinuous(A1)");
+    }
+  }
+  else if (pin == strPins[1])
+  {
+    Serial.print(elapsedTime);
+    Serial.println(": A1");
+    uint16_t val                  = adc->adc0->readSingle();
+    strBuffers[1][bufferCnt[1]++] = val;
+    if (bufferCnt[1] == BUFFER_SIZE)
+    {
+      bufferCnt[1] = 0;
+    }
+    elapsedTime = 0;
+    if (!(retVal = adc->adc0->startSingleRead(strPins[0])))
+    {
+      Serial.println("Error on startContinuous(A0)");
+    }
+  }
+  else
+  {
+    adc->readSingle();
+  }
+
+  if (adc->adc0->adcWasInUse)
+  {
+    Serial.println("In use");
+    adc->adc0->loadConfig(&adc->adc0->adc_config);
+    adc->adc0->adcWasInUse = false;
+  }
+  // adc->adc0->readSingle();
 }
