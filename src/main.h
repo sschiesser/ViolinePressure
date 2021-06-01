@@ -1,9 +1,9 @@
 #ifndef INIT_H
 #define INIT_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+// #ifdef __cplusplus
+// extern "C" {
+// #endif
 
 #include "Arduino.h"
 
@@ -21,8 +21,8 @@ enum class MACHINE_STATE : uint8_t {
   ERROR
 };
 
-#ifdef __cplusplus
-}
-#endif
+// #ifdef __cplusplus
+// }
+// #endif
 
 #endif /* INIT_H */

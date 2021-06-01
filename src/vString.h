@@ -1,9 +1,9 @@
 #ifndef VSTRING_H
 #define VSTRING_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+// #ifdef __cplusplus
+// extern "C" {
+// #endif
 
 #include "Arduino.h"
 
@@ -33,8 +33,8 @@ class vString
   uint16_t adcToDecimal();
 };
 
-#ifdef __cplusplus
-}
-#endif
+// #ifdef __cplusplus
+// }
+// #endif
 
 #endif /* VSTRING_H */
