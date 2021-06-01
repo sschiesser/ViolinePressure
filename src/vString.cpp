@@ -1,13 +1,12 @@
 #include "vString.h"
 
-vString::vString(uint8_t pin, char name)
+vString::vString(uint8_t pin, char name, uint8_t number)
 {
   adcPin       = pin;
   adcHead      = 0;
   adcTail      = 0;
   strName      = name;
-  calMin       = UINT16_MAX;
-  calMax       = 0;
+  strNumber    = number;
   calRange.min = UINT16_MAX;
   calRange.max = 0;
   newVal       = false;

@@ -6,8 +6,10 @@
 
 elapsedMicros elapsedTime;
 ADC* adc      = new ADC(); // adc object;
-vString* Gstr = new vString(A0, 'G');
-vString* Estr = new vString(A1, 'E');
+vString* Gstr = new vString(A0, 'G', 0);
+vString* Dstr = new vString(A2, 'D', 1);
+vString* Astr = new vString(A3, 'A', 2);
+vString* Estr = new vString(A1, 'E', 3);
 
 MACHINE_STATE machineState = MACHINE_STATE::IDLE;
 
@@ -60,35 +62,52 @@ void calibrate()
   char c = 0;
 
   Serial.println("Calibrate pressure ranges.");
+  displayHelp();
   while (machineState == MACHINE_STATE::CALIBRATING)
   {
-    Serial.println("Press 'g' for G string, 'e' for E string or 'x' to exit.");
     while (!Serial.available())
       ;
 
     c = Serial.read();
-    if (c == 'g')
+    if (c == 'a')
     {
-      Serial.println("Calibrating G string, press 'x' to finish");
-      // doCalibrate(Gstr->adcPin, &Gstr->calMin, &Gstr->calMax);
-      // Serial.printf("Calibration values on G string: %d - %d\n", Gstr->calMin, Gstr->calMax);
-      doCalibrate(Gstr->adcPin, &Gstr->calRange);
-      Serial.printf("Calibration values on G string: %d - %d\n", Gstr->calRange.min, Gstr->calRange.max);
+      Serial.println("A string not available yet!");
+      displayHelp();
+    }
+    else if (c == 'd')
+    {
+      Serial.println("D string not available yet!");
       displayHelp();
     }
     else if (c == 'e')
     {
       Serial.println("Calibrating E string, press 'x' to finish");
-      // doCalibrate(Estr->adcPin, &Estr->calMin, &Estr->calMax);
-      // Serial.printf("Calibration values on E string: %d - %d\n", Estr->calMin, Estr->calMax);
       doCalibrate(Estr->adcPin, &Estr->calRange);
       Serial.printf("Calibration values on G string: %d - %d\n", Estr->calRange.min, Estr->calRange.max);
+      displayHelp();
+    }
+    else if (c == 'g')
+    {
+      Serial.println("Calibrating G string, press 'x' to finish");
+      doCalibrate(Gstr->adcPin, &Gstr->calRange);
+      Serial.printf("Calibration values on G string: %d - %d\n", Gstr->calRange.min, Gstr->calRange.max);
+
+      displayHelp();
+    }
+    else if (c == 'v')
+    {
+      Serial.println("Current calibration values");
+      Serial.printf("G: %d - %d\n", Gstr->calRange.min, Gstr->calRange.max);
+      Serial.printf("A: not available yet\n");
+      Serial.printf("D: not available yet\n");
+      Serial.printf("E: %d - %d\n", Estr->calRange.min, Estr->calRange.max);
       displayHelp();
     }
     else if (c == 'x')
     {
       Serial.println("\nExiting calibration");
       machineState = MACHINE_STATE::IDLE;
+      displayHelp();
     }
     else
     {
@@ -97,23 +116,19 @@ void calibrate()
   }
 }
 
-// void doCalibrate(uint8_t pin, uint16_t* min, uint16_t* max) //minmax_t* range)
 void doCalibrate(uint8_t pin, minmax_t* range)
 {
   bool doCal = true;
-  // *min       = UINT16_MAX;
-  // *max       = 0;
   range->min = UINT16_MAX;
   range->max = 0;
   while (doCal)
   {
     uint16_t val = adc->adc0->analogRead(pin);
-    Serial.print("val: ");
-    Serial.println(val);
-    // if (val > *max) *max = val;
-    // if (val < *min) *min = val;
+    // Serial.print("val: ");
+    // Serial.println(val);
     if (val > range->max) range->max = val;
     if (val < range->min) range->min = val;
+    displayRange(*range);
 
     if (Serial.available())
     {
@@ -124,8 +139,7 @@ void doCalibrate(uint8_t pin, minmax_t* range)
       }
     }
   }
-  // Serial.printf("Calibration values on current string: %d - %d\n", *min, *max);
-  Serial.printf("Calibration values on current string: %d - %d\n", range->min, range->max);
+  // Serial.printf("Calibration values on current string: %d - %d\n", range->min, range->max);
 }
 
 void measure()
@@ -186,22 +200,56 @@ void measureString(uint8_t pin)
 //   return adc->adc0->analogRead(pin);
 // }
 
-// void displayString(uint16_t strVal)
-// {
-//   uint8_t disp = uint8_t(strVal * 99 / adc->adc0->getMaxValue());
-//   for (int i = 0; i < disp; i++)
-//   {
-//     Serial.print("*");
-//   }
-//   Serial.println("");
-// }
+void displayRange(minmax_t range)
+{
+  static minmax_t localRange = {.min = UINT16_MAX, .max = 0};
+  static uint8_t dispMin, dispMax;
+
+  if (range.min < localRange.min)
+  {
+    localRange.min = range.min;
+    dispMin        = 100 * localRange.min / 1023;
+    // Serial.printf("New min: %d\n", localRange.min);
+  }
+  if (range.max > localRange.max)
+  {
+    localRange.max = range.max;
+    dispMax        = 100 * localRange.max / 1023;
+    // Serial.printf("New max: %d\n", localRange.max);
+  }
+  Serial.printf("\r[");
+  for (int i = 0; i < 100; i++)
+  {
+    if (i < dispMin)
+      Serial.printf(" ");
+    else if ((i > dispMin) && (i < dispMax))
+      Serial.printf("*");
+    else if (i > dispMax)
+      Serial.printf(" ");
+  }
+  Serial.printf("]\n");
+}
+
+void displayString(uint16_t strVal)
+{
+  uint8_t disp = uint8_t(strVal * 99 / adc->adc0->getMaxValue());
+  for (int i = 0; i < disp; i++)
+  {
+    Serial.print("*");
+  }
+  Serial.println("");
+}
 
 void displayHelp()
 {
-  Serial.println("'c' : calibrate string pressure ranges");
-  Serial.println("'m' : measure string pressures (continuous)");
-  Serial.println("'h' : display help");
-  Serial.println("'x' : exit calibration or measuring mode");
+  if (machineState == MACHINE_STATE::IDLE)
+  {
+    Serial.print("'c' : calibrate string pressure ranges\n'm' : measure string pressures (continuous)\n'h' : display help\n'x' : exit calibration or measuring mode\n");
+  }
+  else if (machineState == MACHINE_STATE::CALIBRATING)
+  {
+    Serial.printf("'g': G string\n'd': D string\n'd': D string\n'e': E string\n'v': view current calibration\n'x': exit.\n");
+  }
 }
 
 // If you enable interrupts make sure to call readSingle() to clear the interrupt.

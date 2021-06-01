@@ -14,6 +14,7 @@ class vString
   private:
   public:
   char strName;
+  uint8_t strNumber;
   bool newVal;
   const uint16_t bufferSize = BUFFER_SIZE;
   uint8_t adcPin;
@@ -22,11 +23,9 @@ class vString
   uint16_t adcCurVal;
   uint16_t adcDispValue;
   uint16_t decimalValue;
-  uint16_t calMin;
-  uint16_t calMax;
   minmax_t calRange;
 
-  vString(uint8_t pin, char name);
+  vString(uint8_t pin, char name, uint8_t number);
   ~vString();
 
   uint16_t adcToDecimal();
