@@ -5,9 +5,9 @@
 #include <ADC_util.h>
 
 elapsedMicros elapsedTime;
-ADC* adc      = new ADC();       // adc object;
-vString* Gstr = new vString(A0); //, 'G');
-vString* Estr = new vString(A1); //, 'E');
+ADC* adc      = new ADC(); // adc object;
+vString* Gstr = new vString(A0, 'G');
+vString* Estr = new vString(A1, 'E');
 
 MACHINE_STATE machineState = MACHINE_STATE::IDLE;
 
@@ -23,6 +23,11 @@ void setup()
   adc->adc0->setConversionSpeed(ADC_CONVERSION_SPEED::VERY_LOW_SPEED); // change the conversion speed
   adc->adc0->setSamplingSpeed(ADC_SAMPLING_SPEED::VERY_LOW_SPEED);     // change the sampling speed
 
+  // Serial.println("G string settings:");
+  // Serial.printf("Pin > %d; name > %c; range > %d - %d\n", Gstr->adcPin, Gstr->strName, Gstr->calibRange.min, Gstr->calibRange.max);
+  // Serial.println("");
+  // Serial.println("E string settings:");
+  // Serial.printf("Pin > %d; name > %c; range > %d - %d\n", Estr->adcPin, Estr->strName, Estr->calibRange.min, Estr->calibRange.max);
   displayHelp();
 }
 
@@ -65,13 +70,14 @@ void calibrate()
     if (c == 'g')
     {
       Serial.println("Calibrating G string, press 'x' to finish");
-      doCalibrate(Gstr->pin);
+      doCalibrate(Gstr->adcPin, &Gstr->calMin, &Gstr->calMax);
+      Serial.printf("Calibration values on G string: %d - %d\n", Gstr->calMin, Gstr->calMax);
       displayHelp();
     }
     else if (c == 'e')
     {
       Serial.println("Calibrating E string, press 'x' to finish");
-      doCalibrate(Estr->pin);
+      doCalibrate(Estr->adcPin, &Estr->calMin, &Estr->calMax);
       displayHelp();
     }
     else if (c == 'x')
@@ -86,70 +92,29 @@ void calibrate()
   }
 }
 
-void doCalibrate(uint8_t adcPin)
+void doCalibrate(uint8_t pin, uint16_t* min, uint16_t* max) //minmax_t* range)
 {
-  for (int i = 0; i < 200; i++)
+  bool doCal = true;
+  *min       = UINT16_MAX;
+  *max       = 0;
+  while (doCal)
   {
-    Serial.print(".");
+    uint16_t val = adc->adc0->analogRead(pin);
+    Serial.print("val: ");
+    Serial.println(val);
+    if (val > *max) *max = val;
+    if (val < *min) *min = val;
+
+    if (Serial.available())
+    {
+      char c = Serial.read();
+      if (c == 'x')
+      {
+        doCal = false;
+      }
+    }
   }
-  Serial.println("");
-  // bool doCal = true;
-  // while (doCal)
-  // {
-  // }
-  // uint16_t value;
-  // bool calibrating = true;
-  // uint32_t timeCnt = 0;
-  // uint16_t range[] = {UINT16_MAX, 0};
-  // char c           = 0;
-
-  // while (calibrating)
-  // {
-  //   value = measureString(strNb);
-  //   displayString(value);
-
-  //   if (value < range[0])
-  //   {
-  //     range[0] = value;
-  //     timeCnt  = 0;
-  //   }
-  //   else if (value > range[1])
-  //   {
-  //     range[1] = value;
-  //     timeCnt  = 0;
-  //   }
-  //   else
-  //   {
-  //     timeCnt++;
-  //   }
-
-  //   if (Serial.available())
-  //   {
-  //     c = Serial.read();
-  //     if (c == 'x')
-  //     {
-  //       switch (strNb)
-  //       {
-  //         case 0:
-  //           strRanges[0][0] = range[0];
-  //           strRanges[0][1] = range[1];
-  //           break;
-  //         case 1:
-  //           strRanges[1][0] = range[0];
-  //           strRanges[1][1] = range[1];
-  //           break;
-  //         default:
-  //           break;
-  //       }
-  //       Serial.println("Exiting calibration");
-  //       Serial.print("Range: ");
-  //       Serial.print(range[0]);
-  //       Serial.print(" - ");
-  //       Serial.println(range[1]);
-  //       calibrating = false;
-  //     }
-  //   }
-  // }
+  Serial.printf("Calibration values on current string: %d - %d\n", *min, *max);
 }
 
 void measure()
@@ -193,13 +158,13 @@ void measure()
   //   }
 }
 
-void measureString(uint8_t adcPin)
+void measureString(uint8_t pin)
 {
   bool retVal = false;
   // adc->adc0->enableInterrupts(adc0_isr);
-  if (!(retVal = adc->adc0->startSingleRead(adcPin)))
+  if (!(retVal = adc->adc0->startSingleRead(pin)))
   {
-    Serial.printf("Error on startSingleRead(%d)\n", adcPin);
+    Serial.printf("Error on startSingleRead(%d)\n", pin);
   }
 
   displayHelp();
@@ -232,7 +197,7 @@ void displayHelp()
 void adc0_isr()
 {
   uint8_t pin = ADC::sc1a2channelADC0[ADC0_SC1A & ADC_SC1A_CHANNELS];
-  if (pin == Gstr->pin)
+  if (pin == Gstr->adcPin)
   {
     if ((Gstr->adcHead + 1) < Gstr->bufferSize)
       Gstr->adcHead++;
@@ -249,7 +214,7 @@ void adc0_isr()
       Serial.println("Buffer overflow on string G");
     }
   }
-  else if (pin == Estr->pin)
+  else if (pin == Estr->adcPin)
   {
     if ((Estr->adcHead + 1) < Estr->bufferSize)
       Estr->adcHead++;

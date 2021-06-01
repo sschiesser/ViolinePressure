@@ -1,14 +1,11 @@
 #ifndef INIT_H
 #define INIT_H
 
-// #ifdef __cplusplus
-// extern "C" {
-// #endif
-
 #include "Arduino.h"
+#include "vString.h"
 
 void calibrate();
-void doCalibrate(uint8_t adcPin);
+void doCalibrate(uint8_t adcPin, uint16_t* min, uint16_t* max); //minmax_t* range);
 void measure();
 void measureString(uint8_t adcPin);
 // void displayString(uint16_t strVal);
@@ -20,9 +17,5 @@ enum class MACHINE_STATE : uint8_t {
   MEASURING,
   ERROR
 };
-
-// #ifdef __cplusplus
-// }
-// #endif
 
 #endif /* INIT_H */
