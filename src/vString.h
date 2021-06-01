@@ -4,10 +4,10 @@
 #include "Arduino.h"
 
 #define BUFFER_SIZE 500
-// typedef struct
-// {
-//   uint16_t min, max;
-// } minmax_t;
+typedef struct
+{
+  uint16_t min, max;
+} minmax_t;
 
 class vString
 {
@@ -24,7 +24,7 @@ class vString
   uint16_t decimalValue;
   uint16_t calMin;
   uint16_t calMax;
-  // minmax_t calibRange;
+  minmax_t calRange;
 
   vString(uint8_t pin, char name);
   ~vString();

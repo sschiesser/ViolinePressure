@@ -70,14 +70,19 @@ void calibrate()
     if (c == 'g')
     {
       Serial.println("Calibrating G string, press 'x' to finish");
-      doCalibrate(Gstr->adcPin, &Gstr->calMin, &Gstr->calMax);
-      Serial.printf("Calibration values on G string: %d - %d\n", Gstr->calMin, Gstr->calMax);
+      // doCalibrate(Gstr->adcPin, &Gstr->calMin, &Gstr->calMax);
+      // Serial.printf("Calibration values on G string: %d - %d\n", Gstr->calMin, Gstr->calMax);
+      doCalibrate(Gstr->adcPin, &Gstr->calRange);
+      Serial.printf("Calibration values on G string: %d - %d\n", Gstr->calRange.min, Gstr->calRange.max);
       displayHelp();
     }
     else if (c == 'e')
     {
       Serial.println("Calibrating E string, press 'x' to finish");
-      doCalibrate(Estr->adcPin, &Estr->calMin, &Estr->calMax);
+      // doCalibrate(Estr->adcPin, &Estr->calMin, &Estr->calMax);
+      // Serial.printf("Calibration values on E string: %d - %d\n", Estr->calMin, Estr->calMax);
+      doCalibrate(Estr->adcPin, &Estr->calRange);
+      Serial.printf("Calibration values on G string: %d - %d\n", Estr->calRange.min, Estr->calRange.max);
       displayHelp();
     }
     else if (c == 'x')
@@ -92,18 +97,23 @@ void calibrate()
   }
 }
 
-void doCalibrate(uint8_t pin, uint16_t* min, uint16_t* max) //minmax_t* range)
+// void doCalibrate(uint8_t pin, uint16_t* min, uint16_t* max) //minmax_t* range)
+void doCalibrate(uint8_t pin, minmax_t* range)
 {
   bool doCal = true;
-  *min       = UINT16_MAX;
-  *max       = 0;
+  // *min       = UINT16_MAX;
+  // *max       = 0;
+  range->min = UINT16_MAX;
+  range->max = 0;
   while (doCal)
   {
     uint16_t val = adc->adc0->analogRead(pin);
     Serial.print("val: ");
     Serial.println(val);
-    if (val > *max) *max = val;
-    if (val < *min) *min = val;
+    // if (val > *max) *max = val;
+    // if (val < *min) *min = val;
+    if (val > range->max) range->max = val;
+    if (val < range->min) range->min = val;
 
     if (Serial.available())
     {
@@ -114,7 +124,8 @@ void doCalibrate(uint8_t pin, uint16_t* min, uint16_t* max) //minmax_t* range)
       }
     }
   }
-  Serial.printf("Calibration values on current string: %d - %d\n", *min, *max);
+  // Serial.printf("Calibration values on current string: %d - %d\n", *min, *max);
+  Serial.printf("Calibration values on current string: %d - %d\n", range->min, range->max);
 }
 
 void measure()
