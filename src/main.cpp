@@ -46,8 +46,15 @@ void loop()
     }
     else if (c == 'm')
     {
-      machineState = MACHINE_STATE::MEASURING;
-      measure();
+      if (checkCalib())
+      {
+        machineState = MACHINE_STATE::MEASURING;
+        measure();
+      }
+      else
+      {
+        Serial.println("Please calibrate the string first!");
+      }
     }
     else if (c == 'h')
     {
@@ -59,7 +66,8 @@ void loop()
 
 void calibrate()
 {
-  char c = 0;
+  char c      = 0;
+  bool retVal = false;
 
   Serial.println("Calibrate pressure ranges.");
   displayHelp();
@@ -82,15 +90,31 @@ void calibrate()
     else if (c == 'e')
     {
       Serial.println("Calibrating E string, press 'x' to finish");
-      doCalibrate(Estr->adcPin, &Estr->calRange);
-      Serial.printf("Calibration values on G string: %d - %d\n", Estr->calRange.min, Estr->calRange.max);
+      Estr->calibOK = false;
+      if (retVal = doCalibrate(Estr->adcPin, &Estr->calRange))
+      {
+        Estr->calibOK = true;
+        Serial.print("Calibration OK. ");
+      }
+      else
+        Serial.print("Calibration poor. ");
+
+      Serial.printf("Values on E string: %d - %d\n", Estr->calRange.min, Estr->calRange.max);
       displayHelp();
     }
     else if (c == 'g')
     {
       Serial.println("Calibrating G string, press 'x' to finish");
-      doCalibrate(Gstr->adcPin, &Gstr->calRange);
-      Serial.printf("Calibration values on G string: %d - %d\n", Gstr->calRange.min, Gstr->calRange.max);
+      Gstr->calibOK = false;
+      if (retVal = doCalibrate(Gstr->adcPin, &Gstr->calRange))
+      {
+        Gstr->calibOK = true;
+        Serial.print("Calibration OK. ");
+      }
+      else
+        Serial.print("Calibration poor. ");
+
+      Serial.printf("Vgalues on G string: %d - %d\n", Gstr->calRange.min, Gstr->calRange.max);
 
       displayHelp();
     }
@@ -117,7 +141,7 @@ void calibrate()
   }
 }
 
-void doCalibrate(uint8_t pin, minmax_t* range)
+bool doCalibrate(uint8_t pin, minmax_t* range)
 {
   bool doCal = true;
   range->min = UINT16_MAX;
@@ -137,6 +161,10 @@ void doCalibrate(uint8_t pin, minmax_t* range)
       if (c == 'x')
       {
         doCal = false;
+        if ((range->min < STR_CALIB_MIN) && (range->max > STR_CALIB_MAX))
+          return true;
+        else
+          return false;
       }
     }
   }
@@ -145,11 +173,49 @@ void doCalibrate(uint8_t pin, minmax_t* range)
 
 void measure()
 {
-  for (int i = 0; i < 200; i++)
+  bool retVal     = false;
+  uint16_t adcVal = 0;
+  Gstr->newVal    = false;
+  Estr->newVal    = false;
+
+  adc->adc0->enableInterrupts(adc0_isr);
+  retVal = adc->adc0->startSingleRead(Gstr->adcPin);
+  while (machineState == MACHINE_STATE::MEASURING)
   {
-    Serial.print(".");
+    if (Gstr->newVal)
+    {
+      if ((Gstr->adcTail + 1) < Gstr->bufferSize)
+        Gstr->adcTail++;
+      else
+        Gstr->adcTail = 0;
+
+      adcVal       = Gstr->adcBuffer[Gstr->adcTail];
+      Gstr->newVal = false;
+      Serial.printf("G: %d    ", adcVal);
+      retVal = adc->adc0->startSingleRead(Estr->adcPin);
+    }
+    if (Estr->newVal)
+    {
+      if ((Estr->adcTail + 1) < Estr->bufferSize)
+        Estr->adcTail++;
+      else
+        Estr->adcTail = 0;
+
+      adcVal       = Estr->adcBuffer[Estr->adcTail];
+      Estr->newVal = false;
+      Serial.printf("E: %d\n", adcVal);
+      retVal = adc->adc0->startSingleRead(Gstr->adcPin);
+    }
+    if (Serial.available())
+    {
+      char c = Serial.read();
+      if (c == 'x')
+      {
+        displayHelp();
+        machineState = MACHINE_STATE::IDLE;
+      }
+    }
   }
-  Serial.println("");
   //   char c = 0;
 
   //   while (machineState == MACHINE_STATE::MEASURING)
@@ -172,15 +238,6 @@ void measure()
   //       Serial.println(getStringADCError(adc->adc0->fail_flag));
   //     }
 
-  //     if (Serial.available())
-  //     {
-  //       c = Serial.read();
-  //       if (c == 'x')
-  //       {
-  //         displayHelp();
-  //         measuring = false;
-  //       }
-  //     }
   //   }
 }
 
@@ -195,11 +252,6 @@ void measureString(uint8_t pin)
 
   displayHelp();
 }
-
-// uint16_t measureString(uint8_t pin)
-// {
-//   return adc->adc0->analogRead(pin);
-// }
 
 void displayRange(minmax_t range)
 {
@@ -298,8 +350,16 @@ void adc0_isr()
 
   if (adc->adc0->adcWasInUse)
   {
-    Serial.println("In use");
+    // Serial.println("In use");
     adc->adc0->loadConfig(&adc->adc0->adc_config);
     adc->adc0->adcWasInUse = false;
   }
+}
+
+bool checkCalib()
+{
+  if (Gstr->checkCal() && Estr->checkCal())
+    return true;
+  else
+    return false;
 }

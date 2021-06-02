@@ -4,6 +4,9 @@
 #include "Arduino.h"
 
 #define BUFFER_SIZE 500
+#define STR_CALIB_MIN 100
+#define STR_CALIB_MAX 800
+
 typedef struct
 {
   uint16_t min, max;
@@ -16,6 +19,7 @@ class vString
   char strName;
   uint8_t strNumber;
   bool newVal;
+  bool calibOK;
   const uint16_t bufferSize = BUFFER_SIZE;
   uint8_t adcPin;
   uint16_t adcBuffer[BUFFER_SIZE];
@@ -28,6 +32,7 @@ class vString
   vString(uint8_t pin, char name, uint8_t number);
   ~vString();
 
+  bool checkCal();
   uint16_t adcToDecimal();
 };
 

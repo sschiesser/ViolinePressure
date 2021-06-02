@@ -10,9 +10,15 @@ vString::vString(uint8_t pin, char name, uint8_t number)
   calRange.min = UINT16_MAX;
   calRange.max = 0;
   newVal       = false;
+  calibOK      = false;
   pinMode(adcPin, INPUT);
 }
 
 vString::~vString()
 {
+}
+
+bool vString::checkCal()
+{
+  return calibOK;
 }

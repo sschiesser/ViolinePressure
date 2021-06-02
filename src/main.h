@@ -5,7 +5,8 @@
 #include "vString.h"
 
 void calibrate();
-void doCalibrate(uint8_t adcPin, minmax_t* range);
+bool doCalibrate(uint8_t adcPin, minmax_t* range);
+bool checkCalib();
 void measure();
 void measureString(uint8_t adcPin);
 void displayRange(minmax_t range);
