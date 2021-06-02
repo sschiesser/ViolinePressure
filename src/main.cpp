@@ -197,7 +197,9 @@ void measure()
 
         adcVal       = Gstr->adcBuffer[Gstr->adcTail];
         Gstr->newVal = false;
-        Serial.printf("G: %d    ", adcVal);
+        Serial.print(elapsedTime);
+        Serial.printf(" G: %d    ", adcVal);
+        // elapsedTime = 0;
         retVal = adc->adc0->startSingleRead(Estr->adcPin);
       }
       if (Estr->newVal)
@@ -209,8 +211,10 @@ void measure()
 
         adcVal       = Estr->adcBuffer[Estr->adcTail];
         Estr->newVal = false;
-        Serial.printf("E: %d\n", adcVal);
-        retVal = adc->adc0->startSingleRead(Gstr->adcPin);
+        Serial.print(elapsedTime);
+        Serial.printf(" E: %d\n", adcVal);
+        elapsedTime = 0;
+        retVal      = adc->adc0->startSingleRead(Gstr->adcPin);
       }
       if (Serial.available())
       {
