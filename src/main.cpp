@@ -91,7 +91,8 @@ void calibrate()
     {
       Serial.println("Calibrating E string, press 'x' to finish");
       Estr->calibOK = false;
-      if (retVal = doCalibrate(Estr->adcPin, &Estr->calRange))
+      retVal        = doCalibrate(Estr->adcPin, &Estr->calRange);
+      if (retVal)
       {
         Estr->calibOK = true;
         Serial.print("Calibration OK. ");
@@ -106,7 +107,8 @@ void calibrate()
     {
       Serial.println("Calibrating G string, press 'x' to finish");
       Gstr->calibOK = false;
-      if (retVal = doCalibrate(Gstr->adcPin, &Gstr->calRange))
+      retVal        = doCalibrate(Gstr->adcPin, &Gstr->calRange);
+      if (retVal)
       {
         Gstr->calibOK = true;
         Serial.print("Calibration OK. ");
@@ -143,9 +145,10 @@ void calibrate()
 
 bool doCalibrate(uint8_t pin, minmax_t* range)
 {
-  bool doCal = true;
-  range->min = UINT16_MAX;
-  range->max = 0;
+  bool doCal  = true;
+  bool retVal = false;
+  range->min  = UINT16_MAX;
+  range->max  = 0;
   while (doCal)
   {
     uint16_t val = adc->adc0->analogRead(pin);
@@ -162,13 +165,14 @@ bool doCalibrate(uint8_t pin, minmax_t* range)
       {
         doCal = false;
         if ((range->min < STR_CALIB_MIN) && (range->max > STR_CALIB_MAX))
-          return true;
+          retVal = true;
         else
-          return false;
+          retVal = false;
       }
     }
   }
   // Serial.printf("Calibration values on current string: %d - %d\n", range->min, range->max);
+  return retVal;
 }
 
 void measure()
@@ -180,39 +184,42 @@ void measure()
 
   adc->adc0->enableInterrupts(adc0_isr);
   retVal = adc->adc0->startSingleRead(Gstr->adcPin);
-  while (machineState == MACHINE_STATE::MEASURING)
+  if (retVal)
   {
-    if (Gstr->newVal)
+    while (machineState == MACHINE_STATE::MEASURING)
     {
-      if ((Gstr->adcTail + 1) < Gstr->bufferSize)
-        Gstr->adcTail++;
-      else
-        Gstr->adcTail = 0;
-
-      adcVal       = Gstr->adcBuffer[Gstr->adcTail];
-      Gstr->newVal = false;
-      Serial.printf("G: %d    ", adcVal);
-      retVal = adc->adc0->startSingleRead(Estr->adcPin);
-    }
-    if (Estr->newVal)
-    {
-      if ((Estr->adcTail + 1) < Estr->bufferSize)
-        Estr->adcTail++;
-      else
-        Estr->adcTail = 0;
-
-      adcVal       = Estr->adcBuffer[Estr->adcTail];
-      Estr->newVal = false;
-      Serial.printf("E: %d\n", adcVal);
-      retVal = adc->adc0->startSingleRead(Gstr->adcPin);
-    }
-    if (Serial.available())
-    {
-      char c = Serial.read();
-      if (c == 'x')
+      if (Gstr->newVal)
       {
-        displayHelp();
-        machineState = MACHINE_STATE::IDLE;
+        if ((Gstr->adcTail + 1) < Gstr->bufferSize)
+          Gstr->adcTail++;
+        else
+          Gstr->adcTail = 0;
+
+        adcVal       = Gstr->adcBuffer[Gstr->adcTail];
+        Gstr->newVal = false;
+        Serial.printf("G: %d    ", adcVal);
+        retVal = adc->adc0->startSingleRead(Estr->adcPin);
+      }
+      if (Estr->newVal)
+      {
+        if ((Estr->adcTail + 1) < Estr->bufferSize)
+          Estr->adcTail++;
+        else
+          Estr->adcTail = 0;
+
+        adcVal       = Estr->adcBuffer[Estr->adcTail];
+        Estr->newVal = false;
+        Serial.printf("E: %d\n", adcVal);
+        retVal = adc->adc0->startSingleRead(Gstr->adcPin);
+      }
+      if (Serial.available())
+      {
+        char c = Serial.read();
+        if (c == 'x')
+        {
+          displayHelp();
+          machineState = MACHINE_STATE::IDLE;
+        }
       }
     }
   }
@@ -256,7 +263,8 @@ void measureString(uint8_t pin)
 void displayRange(minmax_t range)
 {
   minmax_t localRange = {.min = UINT16_MAX, .max = 0};
-  uint8_t dispMin, dispMax;
+  uint8_t dispMin     = 0;
+  uint8_t dispMax     = 0;
 
   if (range.min < localRange.min)
   {
