@@ -105,7 +105,8 @@ void calibrate()
     }
     else if (c == 'x')
     {
-      Serial.println("\nExiting calibration");
+      Serial.println("\nExiting calibration. Ranges:");
+      Serial.printf("G: %d - %d\nA: not available yet\nD: not available yet\nE: %d - %d\n\n", Gstr->calRange.min, Gstr->calRange.max, Estr->calRange.min, Estr->calRange.max);
       machineState = MACHINE_STATE::IDLE;
       displayHelp();
     }
@@ -202,8 +203,8 @@ void measureString(uint8_t pin)
 
 void displayRange(minmax_t range)
 {
-  static minmax_t localRange = {.min = UINT16_MAX, .max = 0};
-  static uint8_t dispMin, dispMax;
+  minmax_t localRange = {.min = UINT16_MAX, .max = 0};
+  uint8_t dispMin, dispMax;
 
   if (range.min < localRange.min)
   {
