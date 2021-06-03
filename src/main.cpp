@@ -4,7 +4,7 @@
 #include <ADC.h>
 #include <ADC_util.h>
 
-elapsedMicros elapsedTime;
+elapsedMillis elapsedTime;
 ADC* adc      = new ADC(); // adc object;
 vString* Gstr = new vString(0, A0, 'G', 0);
 vString* Dstr = new vString(2, A2, 'D', 1);
@@ -180,55 +180,50 @@ bool doCalibrate(uint8_t touchPin, uint8_t adcPin, minmax_t* range)
 
 void measure()
 {
-  bool retVal     = false;
-  uint16_t adcVal = 0;
-  Gstr->newVal    = false;
-  Estr->newVal    = false;
+  uint16_t adcVal   = 0;
+  uint16_t touchVal = 0;
+  uint32_t start    = millis();
+  Gstr->newVal      = false;
+  Estr->newVal      = false;
 
-  adc->adc0->enableInterrupts(adc0_isr);
+  // adc->adc0->enableInterrupts(adc0_isr);
   while (machineState == MACHINE_STATE::MEASURING)
   {
-    if (touchRead(Gstr->touchPin) > 2000)
+    if ((touchVal = touchRead(Gstr->touchPin)) > 2000)
     {
-      retVal = adc->adc0->startSingleRead(Gstr->adcPin);
-      if (retVal)
+      adcVal = adc->adc0->analogRead(Gstr->adcPin);
+
+      // if ((Gstr->adcTail + 1) < Gstr->bufferSize)
+      //   Gstr->adcTail++;
+      // else
+      //   Gstr->adcTail = 0;
+
+      // adcVal = Gstr->adcBuffer[Gstr->adcTail];
+      if ((millis() - start) > 100)
       {
-        while (!Gstr->newVal)
-          ;
-
-        Serial.println("newVal");
-
-        if ((Gstr->adcTail + 1) < Gstr->bufferSize)
-          Gstr->adcTail++;
-        else
-          Gstr->adcTail = 0;
-
-        adcVal       = Gstr->adcBuffer[Gstr->adcTail];
-        Gstr->newVal = false;
         Serial.print(elapsedTime);
-        Serial.printf(" G: %d\n", adcVal);
+        Serial.printf(" G: %d - %d\n", touchVal, adcVal);
         elapsedTime = 0;
+        start       = millis();
       }
     }
 
     if (touchRead(Estr->touchPin) > 2000)
     {
-      retVal = adc->adc0->startSingleRead(Estr->adcPin);
-      if (retVal)
+      adcVal = adc->adc0->analogRead(Estr->adcPin);
+
+      // if ((Estr->adcTail + 1) < Estr->bufferSize)
+      //   Estr->adcTail++;
+      // else
+      //   Estr->adcTail = 0;
+
+      // adcVal       = Estr->adcBuffer[Estr->adcTail];
+      if ((millis() - start) > 100)
       {
-        while (!Estr->newVal)
-          ;
-
-        if ((Estr->adcTail + 1) < Estr->bufferSize)
-          Estr->adcTail++;
-        else
-          Estr->adcTail = 0;
-
-        adcVal       = Estr->adcBuffer[Estr->adcTail];
-        Estr->newVal = false;
         Serial.print(elapsedTime);
         Serial.printf(" E: %d\n", adcVal);
         elapsedTime = 0;
+        start       = millis();
       }
     }
 
@@ -237,7 +232,7 @@ void measure()
       char c = Serial.read();
       if (c == 'x')
       {
-        adc->adc0->disableInterrupts();
+        // adc->adc0->disableInterrupts();
         machineState = MACHINE_STATE::IDLE;
         displayHelp();
       }
@@ -349,7 +344,6 @@ void adc0_isr()
     {
       Gstr->adcBuffer[Gstr->adcHead] = adc->adc0->readSingle();
       Gstr->newVal                   = true;
-      // Serial.printf("G: %d\n", Gstr->adcBuffer[Gstr->adcHead]);
     }
     else
     {
