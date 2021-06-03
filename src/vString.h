@@ -22,6 +22,7 @@ class vString
   bool calibOK;
   const uint16_t bufferSize = BUFFER_SIZE;
   uint8_t adcPin;
+  uint8_t touchPin;
   uint16_t adcBuffer[BUFFER_SIZE];
   uint16_t adcHead, adcTail;
   uint16_t adcCurVal;
@@ -29,11 +30,11 @@ class vString
   uint16_t decimalValue;
   minmax_t calRange;
 
-  vString(uint8_t pin, char name, uint8_t number);
+  vString(uint8_t touchPin, uint8_t adcPin, char name, uint8_t number);
   ~vString();
 
   bool checkCal();
-  uint16_t adcToDecimal();
+  bool stringActive(uint8_t touchPin, uint16_t thresh);
 };
 
 #endif /* VSTRING_H */
