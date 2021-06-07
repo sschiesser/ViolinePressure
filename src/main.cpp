@@ -4,12 +4,12 @@
 #include <ADC.h>
 #include <ADC_util.h>
 
-elapsedMicros elapsedTime;
+elapsedMillis gDetla, eDelta;
 ADC* adc      = new ADC(); // adc object;
 vString* Gstr = new vString(0, A0, 'G', 0);
-vString* Dstr = new vString(2, A2, 'D', 1);
-vString* Astr = new vString(4, A3, 'A', 2);
-vString* Estr = new vString(6, A1, 'E', 3);
+// vString* Dstr = new vString(6, A2, 'D', 1);
+// vString* Astr = new vString(4, A3, 'A', 2);
+vString* Estr = new vString(1, A1, 'E', 1);
 
 MACHINE_STATE machineState = MACHINE_STATE::IDLE;
 
@@ -30,6 +30,8 @@ void setup()
   Serial.println("");
   Serial.println("E string settings:");
   Serial.printf("touch > %d; ADC > %d; name > %c; range > %d - %d\n", Estr->touchPin, Estr->adcPin, Estr->strName, Estr->calRange.min, Estr->calRange.max);
+  Serial.println("");
+
   displayHelp();
 }
 
@@ -80,16 +82,16 @@ void calibrate()
     if (c == 'a')
     {
       Serial.println("A string not available yet!");
-      displayHelp();
+      // displayHelp();
     }
     else if (c == 'd')
     {
       Serial.println("D string not available yet!");
-      displayHelp();
+      // displayHelp();
     }
     else if (c == 'e')
     {
-      Serial.println("Calibrating E string, press 'x' to finish");
+      Serial.printf("Calibrating E string, press 'x' to finish (t: %d, a:%d)\n", Estr->touchPin, Estr->adcPin);
       Estr->calibOK = false;
       retVal        = doCalibrate(Estr->touchPin, Estr->adcPin, &Estr->calRange);
       if (retVal)
@@ -117,7 +119,6 @@ void calibrate()
         Serial.print("Calibration poor. ");
 
       Serial.printf("Vgalues on G string: %d - %d\n", Gstr->calRange.min, Gstr->calRange.max);
-
       displayHelp();
     }
     else if (c == 'v')
@@ -180,55 +181,51 @@ bool doCalibrate(uint8_t touchPin, uint8_t adcPin, minmax_t* range)
 
 void measure()
 {
-  bool retVal     = false;
-  uint16_t adcVal = 0;
-  Gstr->newVal    = false;
-  Estr->newVal    = false;
+  uint16_t adcVal   = 0;
+  uint16_t touchVal = 0;
+  uint32_t eStart   = millis();
+  uint32_t gStart   = millis();
+  Gstr->newVal      = false;
+  Estr->newVal      = false;
 
-  adc->adc0->enableInterrupts(adc0_isr);
+  // adc->adc0->enableInterrupts(adc0_isr);
   while (machineState == MACHINE_STATE::MEASURING)
   {
-    if (touchRead(Gstr->touchPin) > 2000)
+    if ((touchVal = touchRead(Gstr->touchPin)) > 2000)
     {
-      retVal = adc->adc0->startSingleRead(Gstr->adcPin);
-      if (retVal)
+      adcVal = adc->adc0->analogRead(Gstr->adcPin);
+
+      // if ((Gstr->adcTail + 1) < Gstr->bufferSize)
+      //   Gstr->adcTail++;
+      // else
+      //   Gstr->adcTail = 0;
+
+      // adcVal = Gstr->adcBuffer[Gstr->adcTail];
+      if ((millis() - gStart) > 100)
       {
-        while (!Gstr->newVal)
-          ;
-
-        Serial.println("newVal");
-
-        if ((Gstr->adcTail + 1) < Gstr->bufferSize)
-          Gstr->adcTail++;
-        else
-          Gstr->adcTail = 0;
-
-        adcVal       = Gstr->adcBuffer[Gstr->adcTail];
-        Gstr->newVal = false;
-        Serial.print(elapsedTime);
-        Serial.printf(" G: %d\n", adcVal);
-        elapsedTime = 0;
+        Serial.print(gDetla);
+        Serial.printf(" G: %d - %d\n", touchVal, adcVal);
+        gDetla = 0;
+        gStart = millis();
       }
     }
 
-    if (touchRead(Estr->touchPin) > 2000)
+    if ((touchVal = touchRead(Estr->touchPin)) > 2000)
     {
-      retVal = adc->adc0->startSingleRead(Estr->adcPin);
-      if (retVal)
+      adcVal = adc->adc0->analogRead(Estr->adcPin);
+
+      // if ((Estr->adcTail + 1) < Estr->bufferSize)
+      //   Estr->adcTail++;
+      // else
+      //   Estr->adcTail = 0;
+
+      // adcVal       = Estr->adcBuffer[Estr->adcTail];
+      if ((millis() - eStart) > 100)
       {
-        while (!Estr->newVal)
-          ;
-
-        if ((Estr->adcTail + 1) < Estr->bufferSize)
-          Estr->adcTail++;
-        else
-          Estr->adcTail = 0;
-
-        adcVal       = Estr->adcBuffer[Estr->adcTail];
-        Estr->newVal = false;
-        Serial.print(elapsedTime);
-        Serial.printf(" E: %d\n", adcVal);
-        elapsedTime = 0;
+        Serial.print(eDelta);
+        Serial.printf(" E: %d - %d\n", touchVal, adcVal);
+        eDelta = 0;
+        eStart = millis();
       }
     }
 
@@ -237,7 +234,7 @@ void measure()
       char c = Serial.read();
       if (c == 'x')
       {
-        adc->adc0->disableInterrupts();
+        // adc->adc0->disableInterrupts();
         machineState = MACHINE_STATE::IDLE;
         displayHelp();
       }
@@ -269,17 +266,17 @@ void measure()
   //   }
 }
 
-void measureString(uint8_t pin)
-{
-  bool retVal = false;
-  // adc->adc0->enableInterrupts(adc0_isr);
-  if (!(retVal = adc->adc0->startSingleRead(pin)))
-  {
-    Serial.printf("Error on startSingleRead(%d)\n", pin);
-  }
+// void measureString(uint8_t pin)
+// {
+//   bool retVal = false;
+//   // adc->adc0->enableInterrupts(adc0_isr);
+//   if (!(retVal = adc->adc0->startSingleRead(pin)))
+//   {
+//     Serial.printf("Error on startSingleRead(%d)\n", pin);
+//   }
 
-  displayHelp();
-}
+//   displayHelp();
+// }
 
 void displayRange(minmax_t range)
 {
@@ -349,7 +346,6 @@ void adc0_isr()
     {
       Gstr->adcBuffer[Gstr->adcHead] = adc->adc0->readSingle();
       Gstr->newVal                   = true;
-      // Serial.printf("G: %d\n", Gstr->adcBuffer[Gstr->adcHead]);
     }
     else
     {
