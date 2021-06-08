@@ -50,7 +50,7 @@ void loop()
     else if (c == 't')
     {
       machineState = MACHINE_STATE::CALIBRATING_TOUCH;
-      calibrateRange();
+      calibrateTouch();
     }
     else if (c == 'm')
     {
@@ -98,37 +98,35 @@ void calibrateRange()
     else if (c == 'e')
     {
       Serial.printf("Calibrating E string, press 'x' to finish (t: %d, a:%d)\n", Estr->touchPin, Estr->adcPin);
-      Estr->calibOK = false;
-      if (Estr->calibrate(strDataType::CAL_RANGE, adc->adc0, &Estr->adcRange, &Estr->touchRange))
+      Estr->adcCalDone = false;
+      if (Estr->calibrate(strDataType::CAL_RANGE, adc->adc0, &Estr->adcRange, &Estr->touchThresh))
         Serial.print("Calibration OK! ");
       else
         Serial.print("Calibration poor! ");
 
       Serial.printf("Values on E string: 0x%04x - 0x%04x\n", Estr->adcRange.min, Estr->adcRange.max);
-      if (Estr->calibOK) Estr->saveToEeprom(strDataType::CAL_RANGE, (uint8_t*)&Estr->adcRange);
+      if (Estr->adcCalDone) Estr->saveToEeprom(strDataType::CAL_RANGE, (uint8_t*)&Estr->adcRange);
 
       displayHelp();
     }
     else if (c == 'g')
     {
       Serial.printf("Calibrating G string, press 'x' to finish (t: %d, a:%d)\n", Gstr->touchPin, Gstr->adcPin);
-      Gstr->calibOK = false;
-      if (Gstr->calibrate(strDataType::CAL_RANGE, adc->adc0, &Gstr->adcRange, &Gstr->touchRange))
+      Gstr->adcCalDone = false;
+      if (Gstr->calibrate(strDataType::CAL_RANGE, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh))
         Serial.print("Calibration OK! ");
       else
         Serial.print("Calibration poor! ");
 
       Serial.printf("Values on G string: 0x%04x - 0x%04x\n", Gstr->adcRange.min, Gstr->adcRange.max);
-      if (Gstr->calibOK) Gstr->saveToEeprom(strDataType::CAL_RANGE, (uint8_t*)&Gstr->adcRange);
+      if (Gstr->adcCalDone) Gstr->saveToEeprom(strDataType::CAL_RANGE, (uint8_t*)&Gstr->adcRange);
       displayHelp();
     }
     else if (c == 'v')
     {
       Serial.println("Current calibration values");
-      Serial.printf("G: %d - %d\n", Gstr->adcRange.min, Gstr->adcRange.max);
-      Serial.printf("A: not available yet\n");
-      Serial.printf("D: not available yet\n");
-      Serial.printf("E: %d - %d\n", Estr->adcRange.min, Estr->adcRange.max);
+      Gstr->viewCalibValues();
+      Estr->viewCalibValues();
       displayHelp();
     }
     else if (c == 'x')
@@ -147,42 +145,74 @@ void calibrateRange()
 
 void calibrateTouch()
 {
+  char c      = 0;
+  bool retVal = false;
+
+  Serial.println("Calibrate touch thresholds.");
+  displayHelp();
+  while (machineState == MACHINE_STATE::CALIBRATING_TOUCH)
+  {
+    while (!Serial.available())
+      ;
+
+    c = Serial.read();
+    if (c == 'a')
+    {
+      Serial.println("A string not available yet!");
+    }
+    else if (c == 'd')
+    {
+      Serial.println("D string not available yet!");
+    }
+    else if (c == 'e')
+    {
+      Serial.printf("Calibrating E string...\nTouch the string at different places on different manners ('x' to finish (t: %d, a:%d))\n", Estr->touchPin, Estr->adcPin);
+      Estr->touchCalDone = false;
+      if (Estr->calibrate(strDataType::CAL_TOUCH, adc->adc0, &Estr->adcRange, &Estr->touchThresh))
+        Serial.print("Calibration OK! ");
+      else
+        Serial.print("Calibration poor! ");
+
+      Serial.printf("Thresholds on E string: %d - %d (avg: %d)\n", Estr->touchThresh.min, Estr->touchThresh.max, Estr->touchThresh.avg);
+      // if (Estr->touchCalDone) Estr->saveToEeprom(strDataType::CAL_TOUCH, (uint8_t*)&Estr->touchThresh);
+
+      displayHelp();
+    }
+    else if (c == 'g')
+    {
+      Serial.printf("Calibrating G string...\nTouch the string at different places on different manners ('x' to finish (t: %d, a:%d))\n", Gstr->touchPin, Gstr->adcPin);
+      Gstr->touchCalDone = false;
+      if (Gstr->calibrate(strDataType::CAL_TOUCH, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh))
+        Serial.print("Calibration OK! ");
+      else
+        Serial.print("Calibration poor! ");
+
+      Serial.printf("Thresholds on G string: %d -%d (avg: %d)\n", Gstr->touchThresh.min, Gstr->touchThresh.max, Gstr->touchThresh.avg);
+      // if (Gstr->touchCalDone) Gstr->saveToEeprom(strDataType::CAL_TOUCH, (uint8_t*)&Estr->touchThresh);
+
+      displayHelp();
+    }
+    else if (c == 'v')
+    {
+      Serial.println("Current calibration values");
+      Gstr->viewCalibValues();
+      Estr->viewCalibValues();
+      displayHelp();
+    }
+    else if (c == 'x')
+    {
+      Serial.println("\nExiting calibration. Values:");
+      Serial.printf("G: adc -> %d - %d     touch -> %d\n", Gstr->adcRange.min, Gstr->adcRange.max, Gstr->touchThresh.avg);
+      Serial.printf("E: adc -> %d - %d     touch -> %d\n", Estr->adcRange.min, Estr->adcRange.max, Estr->touchThresh.avg);
+      machineState = MACHINE_STATE::IDLE;
+      displayHelp();
+    }
+    else
+    {
+      Serial.println("Please choose a valid option");
+    }
+  }
 }
-
-// bool doCalibrate(uint8_t touchPin, uint8_t adcPin, minmax_t* range)
-// {
-//   bool doCal  = true;
-//   bool retVal = false;
-//   range->min  = UINT16_MAX;
-//   range->max  = 0;
-//   while (doCal)
-//   {
-//     while (touchRead(touchPin) > 20000)
-//     {
-//       uint16_t val = adc->adc0->analogRead(adcPin);
-//       // Serial.print("val: ");
-//       // Serial.println(val);
-//       if (val > range->max) range->max = val;
-//       if (val < range->min) range->min = val;
-//       displayRange(*range);
-//     }
-
-//     if (Serial.available())
-//     {
-//       char c = Serial.read();
-//       if (c == 'x')
-//       {
-//         doCal = false;
-//         if ((range->min < STR_CALIB_MIN) && (range->max > STR_CALIB_MAX))
-//           retVal = true;
-//         else
-//           retVal = false;
-//       }
-//     }
-//   }
-//   // Serial.printf("Calibration values on current string: %d - %d\n", range->min, range->max);
-//   return retVal;
-// }
 
 void measure()
 {
@@ -190,8 +220,8 @@ void measure()
   uint16_t touchVal = 0;
   uint32_t eStart   = millis();
   uint32_t gStart   = millis();
-  Gstr->newVal      = false;
-  Estr->newVal      = false;
+  Gstr->adcNewVal   = false;
+  Estr->adcNewVal   = false;
 
   // adc->adc0->enableInterrupts(adc0_isr);
   while (machineState == MACHINE_STATE::MEASURING)
@@ -271,19 +301,9 @@ void measure()
   //   }
 }
 
-// bool saveToEeprom16(uint16_t* value)
+// void displayRange(range_t range)
 // {
-//   uint8_t eVals[2];
-//   for (uint8_t i = 0; i < 2; i++)
-//   {
-//     eVals[i] = (*value >> (i * 8)) & 0xff;
-//     Serial.printf("eVals[%d] = 0x%02x\n", i, eVals[i]);
-//   }
-// }
-
-// void displayRange(minmax_t range)
-// {
-//   minmax_t localRange = {.min = UINT16_MAX, .max = 0};
+//   range_t localRange = {.min = UINT16_MAX, .max = 0};
 //   uint8_t dispMin     = 0;
 //   uint8_t dispMax     = 0;
 
@@ -338,45 +358,7 @@ void displayHelp()
 // If you enable interrupts make sure to call readSingle() to clear the interrupt.
 void adc0_isr()
 {
-  uint8_t pin = ADC::sc1a2channelADC0[ADC0_SC1A & ADC_SC1A_CHANNELS];
-  if (pin == Gstr->adcPin)
-  {
-    if ((Gstr->bufHead + 1) < Gstr->bufSize)
-      Gstr->bufHead++;
-    else
-      Gstr->bufHead = 0;
-
-    if (Gstr->bufHead != Gstr->bufTail)
-    {
-      Gstr->adcBuf[Gstr->bufHead] = adc->adc0->readSingle();
-      Gstr->newVal                = true;
-    }
-    else
-    {
-      Serial.println("Buffer overflow on string G");
-    }
-  }
-  else if (pin == Estr->adcPin)
-  {
-    if ((Estr->bufHead + 1) < Estr->bufSize)
-      Estr->bufHead++;
-    else
-      Estr->bufHead = 0;
-
-    if (Estr->bufHead != Estr->bufTail)
-    {
-      Estr->adcBuf[Estr->bufHead] = adc->adc0->readSingle();
-      Estr->newVal                = true;
-    }
-    else
-    {
-      Serial.println("Buffer overflow on string E");
-    }
-  }
-  else
-  {
-    adc->readSingle();
-  }
+  adc->readSingle();
 
   if (adc->adc0->adcWasInUse)
   {
@@ -384,12 +366,4 @@ void adc0_isr()
     adc->adc0->loadConfig(&adc->adc0->adc_config);
     adc->adc0->adcWasInUse = false;
   }
-}
-
-bool checkCalib()
-{
-  if (Gstr->checkCal() && Estr->checkCal())
-    return true;
-  else
-    return false;
 }

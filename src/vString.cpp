@@ -2,40 +2,62 @@
 
 vString::vString(uint8_t tPin, uint8_t aPin, char strName, uint8_t strNumber)
 {
-  touchPin     = tPin;
-  adcPin       = aPin;
-  bufHead      = 0;
-  bufTail      = 0;
   name         = strName;
   number       = strNumber;
+  adcPin       = aPin;
   adcRange.min = UINT16_MAX;
   adcRange.max = 0;
-  newVal       = false;
-  calibOK      = false;
+  adcCalDone   = false;
+  adcNewVal    = false;
   pinMode(adcPin, INPUT);
+
+  touchPin        = tPin;
+  touchThresh.min = UINT16_MAX;
+  touchThresh.avg = UINT16_MAX;
+  touchThresh.max = 0;
+  touchCalDone    = false;
+  pinMode(touchPin, INPUT);
 }
 
 vString::~vString()
 {
 }
 
-bool vString::checkCal()
+bool vString::checkCalStatus(strDataType type)
 {
-  if ((adcRange.min <= STR_CALIB_MIN) && (adcRange.max >= STR_CALIB_MAX))
-    calibOK = true;
-  else
-    calibOK = false;
+  bool retVal = false;
 
-  return calibOK;
-}
+  switch (type)
+  {
+    case strDataType::CAL_RANGE: {
+      if ((adcRange.min <= ADC_RANGE_MIN) && (adcRange.max >= ADC_RANGE_MAX))
+        adcCalDone = true;
+      else
+        adcCalDone = false;
 
-bool vString::stringActive(uint8_t touchPin, uint16_t thresh)
-{
-  uint16_t val = touchRead(touchPin);
-  if (val > thresh)
-    return true;
-  else
-    return false;
+      retVal = adcCalDone;
+      break;
+    }
+
+    case strDataType::CAL_TOUCH: {
+      if ((touchThresh.min <= TOUCH_THRESH_MIN) && (touchThresh.max >= TOUCH_THRESH_MAX))
+        touchCalDone = true;
+      else
+        touchCalDone = false;
+
+      retVal = touchCalDone;
+      break;
+    }
+
+    case strDataType::MEAS_TOUCH:
+    case strDataType::MEAS_RANGE:
+    case strDataType::ERROR:
+    case strDataType::NONE:
+    default:
+      break;
+  }
+
+  return retVal;
 }
 
 void vString::saveToEeprom(strDataType type, uint8_t* data)
@@ -92,7 +114,7 @@ void vString::getFromEeprom(strDataType type, uint8_t* data)
   }
 }
 
-bool vString::calibrate(strDataType type, ADC_Module* module, minmax_t* range, minmax_t* thresh)
+bool vString::calibrate(strDataType type, ADC_Module* module, range_t* range, thresh_t* thresh)
 {
   bool doCal          = true;
   bool retVal         = false;
@@ -101,11 +123,17 @@ bool vString::calibrate(strDataType type, ADC_Module* module, minmax_t* range, m
   switch (type)
   {
     case strDataType::CAL_RANGE: {
+      if (!touchCalDone)
+      {
+        Serial.println("Please calibrate the string touch thresholds first");
+        doCal = false;
+      }
+
       range->min = UINT16_MAX;
       range->max = 0;
       while (doCal)
       {
-        while (touchRead(touchPin) > 20000)
+        while (touchRead(touchPin) > touchThresh.avg)
         {
           uint16_t val = module->analogRead(adcPin);
           if (val > range->max) range->max = val;
@@ -123,22 +151,41 @@ bool vString::calibrate(strDataType type, ADC_Module* module, minmax_t* range, m
         if (Serial.available())
         {
           char c = Serial.read();
-          if (c == 'x')
-          {
-            doCal = false;
-            if ((range->min < STR_CALIB_MIN) && (range->max > STR_CALIB_MAX)) retVal = true;
-          }
+          if (c == 'x') doCal = false;
         }
       }
 
-      retVal = checkCal();
+      retVal = checkCalStatus(strDataType::CAL_RANGE);
       break;
     }
 
     case strDataType::CAL_TOUCH: {
       thresh->min = UINT16_MAX;
       thresh->max = 0;
-      Serial.printf("CAL_TOUCH on ADC %d\n", module->ADC_num);
+      while (doCal)
+      {
+        uint32_t sum = 0;
+        for (uint8_t i = 0; i < UINT8_MAX; i++)
+        {
+          touchBuf[i] = touchRead(touchPin);
+          sum += touchBuf[i];
+        }
+        uint32_t avg = (uint32_t)(sum / UINT8_MAX);
+        if (avg > thresh->max) thresh->max = avg;
+        if (avg < thresh->min) thresh->min = avg;
+        Serial.print(".");
+
+        if (Serial.available())
+        {
+          char c = Serial.read();
+          if (c == 'x')
+          {
+            doCal       = false;
+            thresh->avg = (thresh->max + thresh->min) / 2;
+            retVal      = checkCalStatus(strDataType::CAL_TOUCH);
+          }
+        }
+      }
       break;
     }
 
@@ -153,7 +200,7 @@ bool vString::calibrate(strDataType type, ADC_Module* module, minmax_t* range, m
   return retVal;
 }
 
-void vString::displayRange(minmax_t* range)
+void vString::displayRange(range_t* range)
 {
   static uint32_t start = 0;
   uint32_t now          = millis();
@@ -162,4 +209,20 @@ void vString::displayRange(minmax_t* range)
     Serial.printf("Range: %d - %d\n", range->min, range->max);
     start = now;
   }
+}
+
+void vString::displayTouch(thresh_t* thresh)
+{
+  static uint32_t start = 0;
+  uint32_t now          = millis();
+  if ((now - start) > 100)
+  {
+    Serial.printf("Thresholds: %d - %d\n", thresh->min, thresh->max);
+    start = now;
+  }
+}
+
+void vString::viewCalibValues()
+{
+  Serial.printf("String: %c, ADC range: %d - %d, touch thresholds: %d - %d (%d)\n", name, adcRange.min, adcRange.max, touchThresh.min, touchThresh.max, touchThresh.avg);
 }

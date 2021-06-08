@@ -5,11 +5,12 @@
 #include "vString.h"
 
 void calibrateRange();
-bool doCalibrate(uint8_t adcPin, uint8_t touchPin, minmax_t* range);
-bool checkCalib();
+void calibrateTouch();
+// bool doCalibrate(uint8_t adcPin, uint8_t touchPin, range_t* range);
+// bool checkCalib();
 void measure();
 void measureString(uint8_t adcPin);
-void displayRange(minmax_t range);
+// void displayRange(range_t range);
 // bool saveToEeprom16(uint16_t* value);
 // void displayString(uint16_t strVal);
 void displayHelp();
