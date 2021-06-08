@@ -4,7 +4,7 @@
 #include "Arduino.h"
 #include "vString.h"
 
-void calibrate();
+void calibrateRange();
 bool doCalibrate(uint8_t adcPin, uint8_t touchPin, minmax_t* range);
 bool checkCalib();
 void measure();
@@ -16,7 +16,8 @@ void displayHelp();
 
 enum class MACHINE_STATE : uint8_t {
   IDLE,
-  CALIBRATING,
+  CALIBRATING_RANGE,
+  CALIBRATING_TOUCH,
   MEASURING,
   ERROR
 };
