@@ -1,9 +1,12 @@
 #ifndef VSTRING_H
 #define VSTRING_H
 
-#include "Arduino.h"
+#include <Arduino.h>
+#include <EEPROM.h>
 
 #define BUFFER_SIZE 500
+#define EEPROM_RANGE_ADDR 0
+#define EEPROM_TOUCH_ADDR 8
 #define STR_CALIB_MIN 100
 #define STR_CALIB_MAX 800
 
@@ -11,6 +14,13 @@ typedef struct
 {
   uint16_t min, max;
 } minmax_t;
+
+enum dataType {
+  NONE = 0,
+  RANGE,
+  TOUCH,
+  ERROR
+};
 
 class vString
 {
@@ -35,6 +45,8 @@ class vString
 
   bool checkCal();
   bool stringActive(uint8_t touchPin, uint16_t thresh);
+  void saveToEeprom(enum dataType, uint8_t* data);
+  void vString::getFromEeprom(enum dataType type, uint8_t* data);
 };
 
 #endif /* VSTRING_H */

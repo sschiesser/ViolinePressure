@@ -32,3 +32,46 @@ bool vString::stringActive(uint8_t touchPin, uint16_t thresh)
   else
     return false;
 }
+
+void vString::saveToEeprom(enum dataType type, uint8_t* data)
+{
+  uint8_t eeVals[4];
+
+  switch (type)
+  {
+    case RANGE:
+      uint32_t eepromAddr = EEPROM_RANGE_ADDR * strNumber;
+      for (uint8_t i = 0; i < 4; i++)
+      {
+        eeVals[i] = *data++;
+        EEPROM.update((eepromAddr + i), eeVals[i]);
+        Serial.printf("eVals[%d] = 0x%02x\n", (eepromAddr + i), eeVals[i]);
+      }
+      break;
+
+    case TOUCH:
+      break;
+
+    case NONE:
+    case ERROR:
+    default:
+      break;
+  }
+}
+
+void vString::getFromEeprom(enum dataType type, uint8_t* data)
+{
+  switch (type)
+  {
+    case RANGE:
+      break;
+
+    case TOUCH:
+      break;
+
+    case NONE:
+    case ERROR:
+    default:
+      break;
+  }
+}

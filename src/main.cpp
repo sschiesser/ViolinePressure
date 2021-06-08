@@ -1,8 +1,9 @@
 #include "main.h"
-#include "Arduino.h"
 #include "vString.h"
 #include <ADC.h>
 #include <ADC_util.h>
+#include <Arduino.h>
+#include <EEPROM.h>
 
 elapsedMillis gDetla, eDelta;
 ADC* adc      = new ADC(); // adc object;
@@ -100,9 +101,12 @@ void calibrate()
         Serial.print("Calibration OK. ");
       }
       else
+      {
         Serial.print("Calibration poor. ");
+      }
 
-      Serial.printf("Values on E string: %d - %d\n", Estr->calRange.min, Estr->calRange.max);
+      Serial.printf("Values on E string: 0x%04x - 0x%04x\n", Estr->calRange.min, Estr->calRange.max);
+      Estr->saveToEeprom(dataType::RANGE, (uint8_t*)&Estr->calRange);
       displayHelp();
     }
     else if (c == 'g')
@@ -118,7 +122,8 @@ void calibrate()
       else
         Serial.print("Calibration poor. ");
 
-      Serial.printf("Vgalues on G string: %d - %d\n", Gstr->calRange.min, Gstr->calRange.max);
+      Serial.printf("Vgalues on G string: 0x%04x - 0x%04x\n", Gstr->calRange.min, Gstr->calRange.max);
+      Gstr->saveToEeprom(dataType::RANGE, (uint8_t*)&Gstr->calRange);
       displayHelp();
     }
     else if (c == 'v')
@@ -152,7 +157,7 @@ bool doCalibrate(uint8_t touchPin, uint8_t adcPin, minmax_t* range)
   range->max  = 0;
   while (doCal)
   {
-    while (touchRead(touchPin) > 2000)
+    while (touchRead(touchPin) > 20000)
     {
       uint16_t val = adc->adc0->analogRead(adcPin);
       // Serial.print("val: ");
@@ -266,16 +271,14 @@ void measure()
   //   }
 }
 
-// void measureString(uint8_t pin)
+// bool saveToEeprom16(uint16_t* value)
 // {
-//   bool retVal = false;
-//   // adc->adc0->enableInterrupts(adc0_isr);
-//   if (!(retVal = adc->adc0->startSingleRead(pin)))
+//   uint8_t eVals[2];
+//   for (uint8_t i = 0; i < 2; i++)
 //   {
-//     Serial.printf("Error on startSingleRead(%d)\n", pin);
+//     eVals[i] = (*value >> (i * 8)) & 0xff;
+//     Serial.printf("eVals[%d] = 0x%02x\n", i, eVals[i]);
 //   }
-
-//   displayHelp();
 // }
 
 void displayRange(minmax_t range)
