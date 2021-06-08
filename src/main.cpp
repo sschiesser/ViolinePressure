@@ -191,7 +191,7 @@ void measure()
   // adc->adc0->enableInterrupts(adc0_isr);
   while (machineState == MACHINE_STATE::MEASURING)
   {
-    if ((touchVal = touchRead(Gstr->touchPin)) > 2000)
+    if ((touchVal = touchRead(Gstr->touchPin)) > 20000)
     {
       adcVal = adc->adc0->analogRead(Gstr->adcPin);
 
@@ -210,7 +210,7 @@ void measure()
       }
     }
 
-    if ((touchVal = touchRead(Estr->touchPin)) > 2000)
+    if ((touchVal = touchRead(Estr->touchPin)) > 20000)
     {
       adcVal = adc->adc0->analogRead(Estr->adcPin);
 
