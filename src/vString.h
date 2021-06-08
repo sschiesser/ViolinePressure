@@ -11,8 +11,8 @@
 #define EEPROM_ADDR_OFFSET 20
 #define ADC_RANGE_MIN 200
 #define ADC_RANGE_MAX 1000
-#define TOUCH_THRESH_MIN 20000
-#define TOUCH_THRESH_MAX 22000
+#define TOUCH_THRESH_MIN 18000
+#define TOUCH_THRESH_MAX 30000
 
 typedef struct
 {
@@ -57,13 +57,17 @@ class vString
   vString(uint8_t touchPin, uint8_t adcPin, char strName, uint8_t strNumber);
   ~vString();
 
+  void getCalibValues();
+  void resetCalibValues(strDataType type);
+
   bool checkCalStatus(strDataType type);
   void saveToEeprom(strDataType type, uint8_t* data);
-  void getFromEeprom(strDataType type, uint8_t* data);
+  void getFromEeprom(strDataType type);
   bool calibrate(strDataType type, ADC_Module* module, range_t* range, thresh_t* thresh);
   void displayRange(range_t* range);
   void displayTouch(thresh_t* thresh);
   void viewCalibValues();
+  void viewStringValues();
 };
 
 #endif /* VSTRING_H */

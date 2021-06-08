@@ -26,11 +26,11 @@ void setup()
   adc->adc0->setConversionSpeed(ADC_CONVERSION_SPEED::VERY_LOW_SPEED); // change the conversion speed
   adc->adc0->setSamplingSpeed(ADC_SAMPLING_SPEED::VERY_LOW_SPEED);     // change the sampling speed
 
-  Serial.println("G string settings:");
-  Serial.printf("touch > %d; ADC > %d; name > %c; range > %d - %d\n", Gstr->touchPin, Gstr->adcPin, Gstr->name, Gstr->adcRange.min, Gstr->adcRange.max);
+  Gstr->viewStringValues();
+  Gstr->getCalibValues();
   Serial.println("");
-  Serial.println("E string settings:");
-  Serial.printf("touch > %d; ADC > %d; name > %c; range > %d - %d\n", Estr->touchPin, Estr->adcPin, Estr->name, Estr->adcRange.min, Estr->adcRange.max);
+  Estr->viewStringValues();
+  Estr->getCalibValues();
   Serial.println("");
 
   displayHelp();
@@ -54,15 +54,22 @@ void loop()
     }
     else if (c == 'm')
     {
-      // if (checkCalib())
-      // {
-      machineState = MACHINE_STATE::MEASURING;
-      measure();
-      // }
-      // else
-      // {
-      //   Serial.println("Please calibrate the string first!");
-      // }
+      if (Gstr->adcCalDone && Estr->adcCalDone && Gstr->touchCalDone && Estr->touchCalDone)
+      {
+        machineState = MACHINE_STATE::MEASURING;
+        measure();
+      }
+      else
+      {
+        Serial.println("Please calibrate first!");
+        Gstr->viewCalibValues();
+        Estr->viewCalibValues();
+      }
+    }
+    else if (c == 'v')
+    {
+      Gstr->viewCalibValues();
+      Estr->viewCalibValues();
     }
     else if (c == 'h')
     {
@@ -74,8 +81,7 @@ void loop()
 
 void calibrateRange()
 {
-  char c      = 0;
-  bool retVal = false;
+  char c = 0;
 
   Serial.println("Calibrate pressure ranges.");
   displayHelp();
@@ -85,68 +91,74 @@ void calibrateRange()
       ;
 
     c = Serial.read();
-    if (c == 'a')
+    if (c == 'e')
     {
-      Serial.println("A string not available yet!");
-      // displayHelp();
-    }
-    else if (c == 'd')
-    {
-      Serial.println("D string not available yet!");
-      // displayHelp();
-    }
-    else if (c == 'e')
-    {
-      Serial.printf("Calibrating E string, press 'x' to finish (t: %d, a:%d)\n", Estr->touchPin, Estr->adcPin);
-      Estr->adcCalDone = false;
-      if (Estr->calibrate(strDataType::CAL_RANGE, adc->adc0, &Estr->adcRange, &Estr->touchThresh))
-        Serial.print("Calibration OK! ");
+      if (Estr->touchCalDone)
+      {
+        Serial.printf("Calibrating E string, press 'x' to finish (t: %d, a:%d)\n", Estr->touchPin, Estr->adcPin);
+        Estr->resetCalibValues(strDataType::CAL_RANGE);
+        Estr->saveToEeprom(strDataType::CAL_RANGE, (uint8_t*)&Estr->adcRange);
+        if (Estr->calibrate(strDataType::CAL_RANGE, adc->adc0, &Estr->adcRange, &Estr->touchThresh))
+          Serial.print("Calibration OK! ");
+        else
+          Serial.print("Calibration poor! ");
+
+        Serial.printf("Values on E string: 0x%04x - 0x%04x\n", Estr->adcRange.min, Estr->adcRange.max);
+        if (Estr->adcCalDone) Estr->saveToEeprom(strDataType::CAL_RANGE, (uint8_t*)&Estr->adcRange);
+        // displayHelp();
+      }
       else
-        Serial.print("Calibration poor! ");
-
-      Serial.printf("Values on E string: 0x%04x - 0x%04x\n", Estr->adcRange.min, Estr->adcRange.max);
-      if (Estr->adcCalDone) Estr->saveToEeprom(strDataType::CAL_RANGE, (uint8_t*)&Estr->adcRange);
-
-      displayHelp();
+      {
+        Serial.println("Please calibrate the string touch thresholds first");
+      }
     }
     else if (c == 'g')
     {
-      Serial.printf("Calibrating G string, press 'x' to finish (t: %d, a:%d)\n", Gstr->touchPin, Gstr->adcPin);
-      Gstr->adcCalDone = false;
-      if (Gstr->calibrate(strDataType::CAL_RANGE, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh))
-        Serial.print("Calibration OK! ");
-      else
-        Serial.print("Calibration poor! ");
+      if (Gstr->touchCalDone)
+      {
+        Serial.printf("Calibrating G string, press 'x' to finish (t: %d, a:%d)\n", Gstr->touchPin, Gstr->adcPin);
+        Gstr->resetCalibValues(strDataType::CAL_RANGE);
+        Gstr->saveToEeprom(strDataType::CAL_RANGE, (uint8_t*)&Gstr->adcRange);
+        if (Gstr->calibrate(strDataType::CAL_RANGE, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh))
+          Serial.print("Calibration OK! ");
+        else
+          Serial.print("Calibration poor! ");
 
-      Serial.printf("Values on G string: 0x%04x - 0x%04x\n", Gstr->adcRange.min, Gstr->adcRange.max);
-      if (Gstr->adcCalDone) Gstr->saveToEeprom(strDataType::CAL_RANGE, (uint8_t*)&Gstr->adcRange);
-      displayHelp();
+        Serial.printf("Values on G string: 0x%04x - 0x%04x\n", Gstr->adcRange.min, Gstr->adcRange.max);
+        if (Gstr->adcCalDone) Gstr->saveToEeprom(strDataType::CAL_RANGE, (uint8_t*)&Gstr->adcRange);
+        // displayHelp();
+      }
+      else
+      {
+        Serial.println("Please calibrate the string touch thresholds first");
+      }
     }
     else if (c == 'v')
     {
       Serial.println("Current calibration values");
       Gstr->viewCalibValues();
       Estr->viewCalibValues();
-      displayHelp();
+      // displayHelp();
     }
     else if (c == 'x')
     {
       Serial.println("\nExiting calibration. Ranges:");
-      Serial.printf("G: %d - %d\nA: not available yet\nD: not available yet\nE: %d - %d\n\n", Gstr->adcRange.min, Gstr->adcRange.max, Estr->adcRange.min, Estr->adcRange.max);
+      Serial.printf("G: %d - %d\nE: %d - %d\n\n", Gstr->adcRange.min, Gstr->adcRange.max, Estr->adcRange.min, Estr->adcRange.max);
       machineState = MACHINE_STATE::IDLE;
-      displayHelp();
+      // displayHelp();
     }
     else
     {
       Serial.println("Please choose a valid option");
     }
+
+    displayHelp();
   }
 }
 
 void calibrateTouch()
 {
-  char c      = 0;
-  bool retVal = false;
+  char c = 0;
 
   Serial.println("Calibrate touch thresholds.");
   displayHelp();
@@ -167,28 +179,30 @@ void calibrateTouch()
     else if (c == 'e')
     {
       Serial.printf("Calibrating E string...\nTouch the string at different places on different manners ('x' to finish (t: %d, a:%d))\n", Estr->touchPin, Estr->adcPin);
-      Estr->touchCalDone = false;
+      Estr->resetCalibValues(strDataType::CAL_TOUCH);
+      Estr->saveToEeprom(strDataType::CAL_TOUCH, (uint8_t*)&Estr->touchThresh);
       if (Estr->calibrate(strDataType::CAL_TOUCH, adc->adc0, &Estr->adcRange, &Estr->touchThresh))
         Serial.print("Calibration OK! ");
       else
         Serial.print("Calibration poor! ");
 
-      Serial.printf("Thresholds on E string: %d - %d (avg: %d)\n", Estr->touchThresh.min, Estr->touchThresh.max, Estr->touchThresh.avg);
-      // if (Estr->touchCalDone) Estr->saveToEeprom(strDataType::CAL_TOUCH, (uint8_t*)&Estr->touchThresh);
+      Serial.printf("Thresholds on E string: 0x%04x - 0x%04x (avg: 0x%04x)\n", Estr->touchThresh.min, Estr->touchThresh.max, Estr->touchThresh.avg);
+      if (Estr->touchCalDone) Estr->saveToEeprom(strDataType::CAL_TOUCH, (uint8_t*)&Estr->touchThresh);
 
       displayHelp();
     }
     else if (c == 'g')
     {
       Serial.printf("Calibrating G string...\nTouch the string at different places on different manners ('x' to finish (t: %d, a:%d))\n", Gstr->touchPin, Gstr->adcPin);
-      Gstr->touchCalDone = false;
+      Gstr->resetCalibValues(strDataType::CAL_TOUCH);
+      Gstr->saveToEeprom(strDataType::CAL_TOUCH, (uint8_t*)&Gstr->touchThresh);
       if (Gstr->calibrate(strDataType::CAL_TOUCH, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh))
         Serial.print("Calibration OK! ");
       else
         Serial.print("Calibration poor! ");
 
-      Serial.printf("Thresholds on G string: %d -%d (avg: %d)\n", Gstr->touchThresh.min, Gstr->touchThresh.max, Gstr->touchThresh.avg);
-      // if (Gstr->touchCalDone) Gstr->saveToEeprom(strDataType::CAL_TOUCH, (uint8_t*)&Estr->touchThresh);
+      Serial.printf("Thresholds on G string: 0x%04x - 0x%04x (avg: 0x%04x)\n", Gstr->touchThresh.min, Gstr->touchThresh.max, Gstr->touchThresh.avg);
+      if (Gstr->touchCalDone) Gstr->saveToEeprom(strDataType::CAL_TOUCH, (uint8_t*)&Gstr->touchThresh);
 
       displayHelp();
     }
@@ -347,11 +361,12 @@ void displayHelp()
   if (machineState == MACHINE_STATE::IDLE)
   {
     Serial.print("'r' : calibrate string pressure RANGE\n't' : calibrate string TOUCH thresholds\n"
-                 "'m' : MEASURE string pressures (continuous)\n'h' : display help\n'x' : exit calibration or measuring modes\n");
+                 "'m' : MEASURE string pressures (continuous)\n'v' : VIEW current calibration values\n"
+                 "'h' : display HELP\n'x' : EXIT calibration or measuring modes\n");
   }
   else if ((machineState == MACHINE_STATE::CALIBRATING_RANGE) || (machineState == MACHINE_STATE::CALIBRATING_TOUCH))
   {
-    Serial.printf("'g': G string\n'd': D string\n'd': D string\n'e': E string\n'v': view current calibration\n'x': exit.\n");
+    Serial.printf("'g': G string\n'e': E string\n'v': VIEW current calibrations\n'x': EXIT.\n");
   }
 }
 

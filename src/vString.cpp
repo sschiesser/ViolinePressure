@@ -23,6 +23,17 @@ vString::~vString()
 {
 }
 
+void vString::getCalibValues()
+{
+  getFromEeprom(strDataType::CAL_RANGE);
+  if ((adcRange.min < ADC_RANGE_MIN) && (adcRange.max > ADC_RANGE_MAX)) adcCalDone = true;
+
+  getFromEeprom(strDataType::CAL_TOUCH);
+  if ((touchThresh.avg > TOUCH_THRESH_MIN) && (touchThresh.avg < TOUCH_THRESH_MAX)) touchCalDone = true;
+
+  viewCalibValues();
+}
+
 bool vString::checkCalStatus(strDataType type)
 {
   bool retVal = false;
@@ -40,7 +51,7 @@ bool vString::checkCalStatus(strDataType type)
     }
 
     case strDataType::CAL_TOUCH: {
-      if ((touchThresh.min <= TOUCH_THRESH_MIN) && (touchThresh.max >= TOUCH_THRESH_MAX))
+      if ((touchThresh.avg > TOUCH_THRESH_MIN) && (touchThresh.avg < TOUCH_THRESH_MAX))
         touchCalDone = true;
       else
         touchCalDone = false;
@@ -62,23 +73,29 @@ bool vString::checkCalStatus(strDataType type)
 
 void vString::saveToEeprom(strDataType type, uint8_t* data)
 {
-  uint8_t eeVals[4];
-
   switch (type)
   {
     case strDataType::CAL_RANGE: {
+      uint8_t len         = 4;
       uint32_t eepromAddr = EEPROM_RANGE_ADDR + (number * EEPROM_ADDR_OFFSET);
-      for (uint8_t i = 0; i < 4; i++)
+      for (uint8_t i = 0; i < len; i++)
       {
-        eeVals[i] = *data++;
-        EEPROM.update((eepromAddr + i), eeVals[i]);
-        Serial.printf("eVals[%d] = 0x%02x\n", (eepromAddr + i), eeVals[i]);
+        EEPROM.update((eepromAddr + i), *data);
+        Serial.printf("eVals[%d] = 0x%02x\n", (eepromAddr + i), *data);
+        data += 1;
       }
       break;
     }
 
     case strDataType::CAL_TOUCH: {
-      uint32_t eepromAddr = EEPROM_RANGE_ADDR + (number * EEPROM_ADDR_OFFSET);
+      uint8_t len         = 6;
+      uint32_t eepromAddr = EEPROM_TOUCH_ADDR + (number * EEPROM_ADDR_OFFSET);
+      for (uint8_t i = 0; i < len; i++)
+      {
+        EEPROM.update((eepromAddr + i), *data);
+        Serial.printf("eeVals[%d] = 0x%02x\n", (eepromAddr + i), *data);
+        data += 1;
+      }
       break;
     }
 
@@ -91,17 +108,32 @@ void vString::saveToEeprom(strDataType type, uint8_t* data)
   }
 }
 
-void vString::getFromEeprom(strDataType type, uint8_t* data)
+void vString::getFromEeprom(strDataType type)
 {
   switch (type)
   {
     case strDataType::CAL_RANGE: {
       uint32_t eepromAddr = EEPROM_RANGE_ADDR + (number * EEPROM_ADDR_OFFSET);
+      uint8_t data[4];
+      for (uint8_t i = 0; i < 4; i++)
+      {
+        data[i] = EEPROM.read(eepromAddr + i);
+      }
+      adcRange.min = ((uint16_t)data[0] & 0x00ff) | (((uint16_t)data[1] << 8) & 0xff00);
+      adcRange.max = ((uint16_t)data[2] & 0x00ff) | (((uint16_t)data[3] << 8) & 0xff00);
       break;
     }
 
     case strDataType::CAL_TOUCH: {
       uint32_t eepromAddr = EEPROM_TOUCH_ADDR + (number * EEPROM_ADDR_OFFSET);
+      uint8_t data[6];
+      for (uint8_t i = 0; i < 6; i++)
+      {
+        data[i] = EEPROM.read(eepromAddr + i);
+      }
+      touchThresh.min = ((uint16_t)data[0] & 0x00ff) | (((uint16_t)data[1] << 8) & 0xff00);
+      touchThresh.max = ((uint16_t)data[2] & 0x00ff) | (((uint16_t)data[3] << 8) & 0xff00);
+      touchThresh.avg = ((uint16_t)data[4] & 0x00ff) | (((uint16_t)data[5] << 8) & 0xff00);
       break;
     }
 
@@ -123,12 +155,6 @@ bool vString::calibrate(strDataType type, ADC_Module* module, range_t* range, th
   switch (type)
   {
     case strDataType::CAL_RANGE: {
-      if (!touchCalDone)
-      {
-        Serial.println("Please calibrate the string touch thresholds first");
-        doCal = false;
-      }
-
       range->min = UINT16_MAX;
       range->max = 0;
       while (doCal)
@@ -224,5 +250,38 @@ void vString::displayTouch(thresh_t* thresh)
 
 void vString::viewCalibValues()
 {
-  Serial.printf("String: %c, ADC range: %d - %d, touch thresholds: %d - %d (%d)\n", name, adcRange.min, adcRange.max, touchThresh.min, touchThresh.max, touchThresh.avg);
+  Serial.printf("String name: %c, ADC range: %d - %d, touch thresholds: %d - %d (%d)\n", name, adcRange.min, adcRange.max, touchThresh.min, touchThresh.max, touchThresh.avg);
+}
+
+void vString::viewStringValues()
+{
+  Serial.printf("String name: %c, number: %d, ADC pin: %d, touch pin: %d\n", name, number, adcPin, touchPin);
+}
+
+void vString::resetCalibValues(strDataType type)
+{
+  switch (type)
+  {
+    case strDataType::CAL_RANGE: {
+      adcCalDone   = false;
+      adcRange.min = UINT16_MAX;
+      adcRange.max = 0;
+      break;
+    }
+
+    case strDataType::CAL_TOUCH: {
+      touchCalDone    = false;
+      touchThresh.min = UINT16_MAX;
+      touchThresh.avg = UINT16_MAX;
+      touchThresh.max = 0;
+      break;
+    }
+
+    case strDataType::MEAS_RANGE:
+    case strDataType::MEAS_TOUCH:
+    case strDataType::ERROR:
+    case strDataType::NONE:
+    default:
+      break;
+  }
 }
