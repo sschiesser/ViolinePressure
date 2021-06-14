@@ -46,10 +46,17 @@ void setup()
 
 void loop()
 {
-  if ((millis() - start) > 100)
+  if ((millis() - start) > 1000)
   {
     RawHID.send(buffer, 64);
     start = millis();
+  }
+
+  byte recv[64];
+  uint8_t n = RawHID.recv(recv, 0);
+  if (n > 0)
+  {
+    RawHID.send(recv, 64);
   }
 
   char c = 0;
