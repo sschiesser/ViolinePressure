@@ -96,15 +96,15 @@ void calibrateRange()
       if (Estr->touchCalDone)
       {
         Serial.printf("Calibrating E string, press 'x' to finish (t: %d, a:%d)\n", Estr->touchPin, Estr->adcPin);
-        Estr->resetCalibValues(strDataType::CAL_RANGE);
-        Estr->saveToEeprom(strDataType::CAL_RANGE, (uint8_t*)&Estr->adcRange);
-        if (Estr->calibrate(strDataType::CAL_RANGE, adc->adc0, &Estr->adcRange, &Estr->touchThresh))
+        Estr->resetCalibValues(CALIB_TYPE::CALIB_RANGE);
+        Estr->saveToEeprom(CALIB_TYPE::CALIB_RANGE, (uint8_t*)&Estr->adcRange);
+        if (Estr->calibrate(CALIB_TYPE::CALIB_RANGE, adc->adc0, &Estr->adcRange, &Estr->touchThresh))
           Serial.print("Calibration OK! ");
         else
           Serial.print("Calibration poor! ");
 
         Serial.printf("Values on E string: 0x%04x - 0x%04x\n", Estr->adcRange.min, Estr->adcRange.max);
-        if (Estr->adcCalDone) Estr->saveToEeprom(strDataType::CAL_RANGE, (uint8_t*)&Estr->adcRange);
+        if (Estr->adcCalDone) Estr->saveToEeprom(CALIB_TYPE::CALIB_RANGE, (uint8_t*)&Estr->adcRange);
         // displayHelp();
       }
       else
@@ -117,15 +117,15 @@ void calibrateRange()
       if (Gstr->touchCalDone)
       {
         Serial.printf("Calibrating G string, press 'x' to finish (t: %d, a:%d)\n", Gstr->touchPin, Gstr->adcPin);
-        Gstr->resetCalibValues(strDataType::CAL_RANGE);
-        Gstr->saveToEeprom(strDataType::CAL_RANGE, (uint8_t*)&Gstr->adcRange);
-        if (Gstr->calibrate(strDataType::CAL_RANGE, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh))
+        Gstr->resetCalibValues(CALIB_TYPE::CALIB_RANGE);
+        Gstr->saveToEeprom(CALIB_TYPE::CALIB_RANGE, (uint8_t*)&Gstr->adcRange);
+        if (Gstr->calibrate(CALIB_TYPE::CALIB_RANGE, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh))
           Serial.print("Calibration OK! ");
         else
           Serial.print("Calibration poor! ");
 
         Serial.printf("Values on G string: 0x%04x - 0x%04x\n", Gstr->adcRange.min, Gstr->adcRange.max);
-        if (Gstr->adcCalDone) Gstr->saveToEeprom(strDataType::CAL_RANGE, (uint8_t*)&Gstr->adcRange);
+        if (Gstr->adcCalDone) Gstr->saveToEeprom(CALIB_TYPE::CALIB_RANGE, (uint8_t*)&Gstr->adcRange);
         // displayHelp();
       }
       else
@@ -179,30 +179,30 @@ void calibrateTouch()
     else if (c == 'e')
     {
       Serial.printf("Calibrating E string...\nTouch the string at different places on different manners ('x' to finish (t: %d, a:%d))\n", Estr->touchPin, Estr->adcPin);
-      Estr->resetCalibValues(strDataType::CAL_TOUCH);
-      Estr->saveToEeprom(strDataType::CAL_TOUCH, (uint8_t*)&Estr->touchThresh);
-      if (Estr->calibrate(strDataType::CAL_TOUCH, adc->adc0, &Estr->adcRange, &Estr->touchThresh))
+      Estr->resetCalibValues(CALIB_TYPE::CALIB_TOUCH);
+      Estr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Estr->touchThresh);
+      if (Estr->calibrate(CALIB_TYPE::CALIB_TOUCH, adc->adc0, &Estr->adcRange, &Estr->touchThresh))
         Serial.print("Calibration OK! ");
       else
         Serial.print("Calibration poor! ");
 
       Serial.printf("Thresholds on E string: 0x%04x - 0x%04x (avg: 0x%04x)\n", Estr->touchThresh.min, Estr->touchThresh.max, Estr->touchThresh.avg);
-      if (Estr->touchCalDone) Estr->saveToEeprom(strDataType::CAL_TOUCH, (uint8_t*)&Estr->touchThresh);
+      if (Estr->touchCalDone) Estr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Estr->touchThresh);
 
       displayHelp();
     }
     else if (c == 'g')
     {
       Serial.printf("Calibrating G string...\nTouch the string at different places on different manners ('x' to finish (t: %d, a:%d))\n", Gstr->touchPin, Gstr->adcPin);
-      Gstr->resetCalibValues(strDataType::CAL_TOUCH);
-      Gstr->saveToEeprom(strDataType::CAL_TOUCH, (uint8_t*)&Gstr->touchThresh);
-      if (Gstr->calibrate(strDataType::CAL_TOUCH, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh))
+      Gstr->resetCalibValues(CALIB_TYPE::CALIB_TOUCH);
+      Gstr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Gstr->touchThresh);
+      if (Gstr->calibrate(CALIB_TYPE::CALIB_TOUCH, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh))
         Serial.print("Calibration OK! ");
       else
         Serial.print("Calibration poor! ");
 
       Serial.printf("Thresholds on G string: 0x%04x - 0x%04x (avg: 0x%04x)\n", Gstr->touchThresh.min, Gstr->touchThresh.max, Gstr->touchThresh.avg);
-      if (Gstr->touchCalDone) Gstr->saveToEeprom(strDataType::CAL_TOUCH, (uint8_t*)&Gstr->touchThresh);
+      if (Gstr->touchCalDone) Gstr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Gstr->touchThresh);
 
       displayHelp();
     }
@@ -230,53 +230,54 @@ void calibrateTouch()
 
 void measure()
 {
-  uint16_t adcVal   = 0;
-  uint16_t touchVal = 0;
-  uint32_t eStart   = millis();
-  uint32_t gStart   = millis();
-  Gstr->adcNewVal   = false;
-  Estr->adcNewVal   = false;
+  // uint16_t adcVal   = 0;
+  // uint16_t touchVal = 0;
+  // uint32_t eStart   = millis();
+  // uint32_t gStart   = millis();
+  // Gstr->adcNewVal   = false;
+  // Estr->adcNewVal   = false;
 
-  // adc->adc0->enableInterrupts(adc0_isr);
+  // // adc->adc0->enableInterrupts(adc0_isr);
   while (machineState == MACHINE_STATE::MEASURING)
   {
-    if ((touchVal = touchRead(Gstr->touchPin)) > 20000)
-    {
-      adcVal = adc->adc0->analogRead(Gstr->adcPin);
+    Gstr->measure(8);
+    //   if ((touchVal = touchRead(Gstr->touchPin)) > 20000)
+    //   {
+    //     adcVal = adc->adc0->analogRead(Gstr->adcPin);
 
-      // if ((Gstr->adcTail + 1) < Gstr->bufferSize)
-      //   Gstr->adcTail++;
-      // else
-      //   Gstr->adcTail = 0;
+    //     // if ((Gstr->adcTail + 1) < Gstr->bufferSize)
+    //     //   Gstr->adcTail++;
+    //     // else
+    //     //   Gstr->adcTail = 0;
 
-      // adcVal = Gstr->adcBuffer[Gstr->adcTail];
-      if ((millis() - gStart) > 100)
-      {
-        Serial.print(gDetla);
-        Serial.printf(" G: %d - %d\n", touchVal, adcVal);
-        gDetla = 0;
-        gStart = millis();
-      }
-    }
+    //     // adcVal = Gstr->adcBuffer[Gstr->adcTail];
+    //     if ((millis() - gStart) > 100)
+    //     {
+    //       Serial.print(gDetla);
+    //       Serial.printf(" G: %d - %d\n", touchVal, adcVal);
+    //       gDetla = 0;
+    //       gStart = millis();
+    //     }
+    //   }
 
-    if ((touchVal = touchRead(Estr->touchPin)) > 20000)
-    {
-      adcVal = adc->adc0->analogRead(Estr->adcPin);
+    //   if ((touchVal = touchRead(Estr->touchPin)) > 20000)
+    //   {
+    //     adcVal = adc->adc0->analogRead(Estr->adcPin);
 
-      // if ((Estr->adcTail + 1) < Estr->bufferSize)
-      //   Estr->adcTail++;
-      // else
-      //   Estr->adcTail = 0;
+    //     // if ((Estr->adcTail + 1) < Estr->bufferSize)
+    //     //   Estr->adcTail++;
+    //     // else
+    //     //   Estr->adcTail = 0;
 
-      // adcVal       = Estr->adcBuffer[Estr->adcTail];
-      if ((millis() - eStart) > 100)
-      {
-        Serial.print(eDelta);
-        Serial.printf(" E: %d - %d\n", touchVal, adcVal);
-        eDelta = 0;
-        eStart = millis();
-      }
-    }
+    //     // adcVal       = Estr->adcBuffer[Estr->adcTail];
+    //     if ((millis() - eStart) > 100)
+    //     {
+    //       Serial.print(eDelta);
+    //       Serial.printf(" E: %d - %d\n", touchVal, adcVal);
+    //       eDelta = 0;
+    //       eStart = millis();
+    //     }
+    //   }
 
     if (Serial.available())
     {

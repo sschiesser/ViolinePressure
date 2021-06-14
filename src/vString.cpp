@@ -25,22 +25,22 @@ vString::~vString()
 
 void vString::getCalibValues()
 {
-  getFromEeprom(strDataType::CAL_RANGE);
+  getFromEeprom(CALIB_TYPE::CALIB_RANGE);
   if ((adcRange.min < ADC_RANGE_MIN) && (adcRange.max > ADC_RANGE_MAX)) adcCalDone = true;
 
-  getFromEeprom(strDataType::CAL_TOUCH);
+  getFromEeprom(CALIB_TYPE::CALIB_TOUCH);
   if ((touchThresh.avg > TOUCH_THRESH_MIN) && (touchThresh.avg < TOUCH_THRESH_MAX)) touchCalDone = true;
 
   viewCalibValues();
 }
 
-bool vString::checkCalStatus(strDataType type)
+bool vString::checkCalStatus(CALIB_TYPE type)
 {
   bool retVal = false;
 
   switch (type)
   {
-    case strDataType::CAL_RANGE: {
+    case CALIB_TYPE::CALIB_RANGE: {
       if ((adcRange.min <= ADC_RANGE_MIN) && (adcRange.max >= ADC_RANGE_MAX))
         adcCalDone = true;
       else
@@ -50,7 +50,7 @@ bool vString::checkCalStatus(strDataType type)
       break;
     }
 
-    case strDataType::CAL_TOUCH: {
+    case CALIB_TYPE::CALIB_TOUCH: {
       if ((touchThresh.avg > TOUCH_THRESH_MIN) && (touchThresh.avg < TOUCH_THRESH_MAX))
         touchCalDone = true;
       else
@@ -60,10 +60,7 @@ bool vString::checkCalStatus(strDataType type)
       break;
     }
 
-    case strDataType::MEAS_TOUCH:
-    case strDataType::MEAS_RANGE:
-    case strDataType::ERROR:
-    case strDataType::NONE:
+    case CALIB_TYPE::CALIB_NONE:
     default:
       break;
   }
@@ -71,11 +68,11 @@ bool vString::checkCalStatus(strDataType type)
   return retVal;
 }
 
-void vString::saveToEeprom(strDataType type, uint8_t* data)
+void vString::saveToEeprom(CALIB_TYPE type, uint8_t* data)
 {
   switch (type)
   {
-    case strDataType::CAL_RANGE: {
+    case CALIB_TYPE::CALIB_RANGE: {
       uint8_t len         = 4;
       uint32_t eepromAddr = EEPROM_RANGE_ADDR + (number * EEPROM_ADDR_OFFSET);
       for (uint8_t i = 0; i < len; i++)
@@ -87,7 +84,7 @@ void vString::saveToEeprom(strDataType type, uint8_t* data)
       break;
     }
 
-    case strDataType::CAL_TOUCH: {
+    case CALIB_TYPE::CALIB_TOUCH: {
       uint8_t len         = 6;
       uint32_t eepromAddr = EEPROM_TOUCH_ADDR + (number * EEPROM_ADDR_OFFSET);
       for (uint8_t i = 0; i < len; i++)
@@ -99,20 +96,17 @@ void vString::saveToEeprom(strDataType type, uint8_t* data)
       break;
     }
 
-    case strDataType::MEAS_RANGE:
-    case strDataType::MEAS_TOUCH:
-    case strDataType::NONE:
-    case strDataType::ERROR:
+    case CALIB_TYPE::CALIB_NONE:
     default:
       break;
   }
 }
 
-void vString::getFromEeprom(strDataType type)
+void vString::getFromEeprom(CALIB_TYPE type)
 {
   switch (type)
   {
-    case strDataType::CAL_RANGE: {
+    case CALIB_TYPE::CALIB_RANGE: {
       uint32_t eepromAddr = EEPROM_RANGE_ADDR + (number * EEPROM_ADDR_OFFSET);
       uint8_t data[4];
       for (uint8_t i = 0; i < 4; i++)
@@ -124,7 +118,7 @@ void vString::getFromEeprom(strDataType type)
       break;
     }
 
-    case strDataType::CAL_TOUCH: {
+    case CALIB_TYPE::CALIB_TOUCH: {
       uint32_t eepromAddr = EEPROM_TOUCH_ADDR + (number * EEPROM_ADDR_OFFSET);
       uint8_t data[6];
       for (uint8_t i = 0; i < 6; i++)
@@ -137,16 +131,13 @@ void vString::getFromEeprom(strDataType type)
       break;
     }
 
-    case strDataType::MEAS_RANGE:
-    case strDataType::MEAS_TOUCH:
-    case strDataType::NONE:
-    case strDataType::ERROR:
+    case CALIB_TYPE::CALIB_NONE:
     default:
       break;
   }
 }
 
-bool vString::calibrate(strDataType type, ADC_Module* module, range_t* range, thresh_t* thresh)
+bool vString::calibrate(CALIB_TYPE type, ADC_Module* module, range_t* range, thresh_t* thresh)
 {
   bool doCal          = true;
   bool retVal         = false;
@@ -154,7 +145,7 @@ bool vString::calibrate(strDataType type, ADC_Module* module, range_t* range, th
 
   switch (type)
   {
-    case strDataType::CAL_RANGE: {
+    case CALIB_TYPE::CALIB_RANGE: {
       range->min = UINT16_MAX;
       range->max = 0;
       while (doCal)
@@ -181,11 +172,11 @@ bool vString::calibrate(strDataType type, ADC_Module* module, range_t* range, th
         }
       }
 
-      retVal = checkCalStatus(strDataType::CAL_RANGE);
+      retVal = checkCalStatus(CALIB_TYPE::CALIB_RANGE);
       break;
     }
 
-    case strDataType::CAL_TOUCH: {
+    case CALIB_TYPE::CALIB_TOUCH: {
       thresh->min = UINT16_MAX;
       thresh->max = 0;
       while (doCal)
@@ -208,22 +199,23 @@ bool vString::calibrate(strDataType type, ADC_Module* module, range_t* range, th
           {
             doCal       = false;
             thresh->avg = (thresh->max + thresh->min) / 2;
-            retVal      = checkCalStatus(strDataType::CAL_TOUCH);
+            retVal      = checkCalStatus(CALIB_TYPE::CALIB_TOUCH);
           }
         }
       }
       break;
     }
 
-    case strDataType::MEAS_RANGE:
-    case strDataType::MEAS_TOUCH:
-    case strDataType::NONE:
-    case strDataType::ERROR:
+    case CALIB_TYPE::CALIB_NONE:
     default:
       break;
   }
 
   return retVal;
+}
+
+void vString::measure(uint8_t smoothing)
+{
 }
 
 void vString::displayRange(range_t* range)
@@ -258,18 +250,18 @@ void vString::viewStringValues()
   Serial.printf("String name: %c, number: %d, ADC pin: %d, touch pin: %d\n", name, number, adcPin, touchPin);
 }
 
-void vString::resetCalibValues(strDataType type)
+void vString::resetCalibValues(CALIB_TYPE type)
 {
   switch (type)
   {
-    case strDataType::CAL_RANGE: {
+    case CALIB_TYPE::CALIB_RANGE: {
       adcCalDone   = false;
       adcRange.min = UINT16_MAX;
       adcRange.max = 0;
       break;
     }
 
-    case strDataType::CAL_TOUCH: {
+    case CALIB_TYPE::CALIB_TOUCH: {
       touchCalDone    = false;
       touchThresh.min = UINT16_MAX;
       touchThresh.avg = UINT16_MAX;
@@ -277,10 +269,7 @@ void vString::resetCalibValues(strDataType type)
       break;
     }
 
-    case strDataType::MEAS_RANGE:
-    case strDataType::MEAS_TOUCH:
-    case strDataType::ERROR:
-    case strDataType::NONE:
+    case CALIB_TYPE::CALIB_NONE:
     default:
       break;
   }

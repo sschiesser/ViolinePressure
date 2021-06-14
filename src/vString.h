@@ -24,13 +24,10 @@ typedef struct
   uint16_t min, max, avg;
 } thresh_t;
 
-enum strDataType {
-  NONE = 0,
-  MEAS_RANGE,
-  MEAS_TOUCH,
-  CAL_RANGE,
-  CAL_TOUCH,
-  ERROR
+enum class CALIB_TYPE : uint8_t {
+  CALIB_NONE = 0,
+  CALIB_RANGE,
+  CALIB_TOUCH
 };
 
 class vString
@@ -58,12 +55,13 @@ class vString
   ~vString();
 
   void getCalibValues();
-  void resetCalibValues(strDataType type);
+  void resetCalibValues(CALIB_TYPE type);
 
-  bool checkCalStatus(strDataType type);
-  void saveToEeprom(strDataType type, uint8_t* data);
-  void getFromEeprom(strDataType type);
-  bool calibrate(strDataType type, ADC_Module* module, range_t* range, thresh_t* thresh);
+  bool checkCalStatus(CALIB_TYPE type);
+  void saveToEeprom(CALIB_TYPE type, uint8_t* data);
+  void getFromEeprom(CALIB_TYPE type);
+  bool calibrate(CALIB_TYPE type, ADC_Module* module, range_t* range, thresh_t* thresh);
+  void measure(uint8_t smoothing);
   void displayRange(range_t* range);
   void displayTouch(thresh_t* thresh);
   void viewCalibValues();
