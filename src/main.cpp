@@ -37,26 +37,27 @@ void setup()
   Serial.println("");
 
   displayHelp();
-  for (int i = 0; i < 64; i++)
-  {
-    buffer[i] = (2 * i) + 1;
-  }
-  start = millis();
 }
 
 void loop()
 {
-  if ((millis() - start) > 1000)
-  {
-    RawHID.send(buffer, 64);
-    start = millis();
-  }
+  /* Packets sent from Teensy to rawHID2OSC forwarder
+      - commands:
+        0xcc cmd 0xff
+      - measurements:
+        0x00 len TtimeH TtimeL StimeH StimeL Str1H Str1L Str2H Str2L Str3H Str3L Str4H Str4L 0xff
+  */
 
   byte recv[64];
+  byte send[64] = {0};
+
   uint8_t n = RawHID.recv(recv, 0);
   if (n > 0)
   {
-    RawHID.send(recv, 64);
+    send[0] = 0xcc;
+    send[1] = recv[0];
+    send[2] = 0xff;
+    RawHID.send(send, 64);
   }
 
   char c = 0;
