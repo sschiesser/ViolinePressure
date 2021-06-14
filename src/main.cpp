@@ -4,6 +4,7 @@
 #include <ADC_util.h>
 #include <Arduino.h>
 #include <EEPROM.h>
+#include <usb_rawhid.h>
 
 elapsedMillis gDetla, eDelta;
 ADC* adc      = new ADC(); // adc object;
@@ -11,6 +12,8 @@ vString* Gstr = new vString(0, A0, 'G', 0);
 // vString* Dstr = new vString(6, A2, 'D', 1);
 // vString* Astr = new vString(4, A3, 'A', 2);
 vString* Estr = new vString(1, A1, 'E', 1);
+uint8_t buffer[64];
+uint32_t start;
 
 MACHINE_STATE machineState = MACHINE_STATE::IDLE;
 
@@ -34,10 +37,21 @@ void setup()
   Serial.println("");
 
   displayHelp();
+  for (int i = 0; i < 64; i++)
+  {
+    buffer[i] = (2 * i) + 1;
+  }
+  start = millis();
 }
 
 void loop()
 {
+  if ((millis() - start) > 100)
+  {
+    RawHID.send(buffer, 64);
+    start = millis();
+  }
+
   char c = 0;
   if (Serial.available())
   {
@@ -240,7 +254,7 @@ void measure()
   // // adc->adc0->enableInterrupts(adc0_isr);
   while (machineState == MACHINE_STATE::MEASURING)
   {
-    Gstr->measure(8);
+    // Gstr->measure(8);
     //   if ((touchVal = touchRead(Gstr->touchPin)) > 20000)
     //   {
     //     adcVal = adc->adc0->analogRead(Gstr->adcPin);
