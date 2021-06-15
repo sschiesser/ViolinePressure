@@ -5,11 +5,11 @@
 #include "vString.h"
 
 enum class MACHINE_STATE : uint8_t {
-  IDLE,
-  CALIB_RANGES,
-  CALIB_TOUCH,
-  MEASURING,
-  ERROR
+  IDLE         = 0x00,
+  CALIB_RANGES = 0x10,
+  CALIB_TOUCH  = 0x11,
+  MEASURING    = 0x20,
+  ERROR        = 0xF0
 };
 
 enum class COMMAND_CODES : char {
@@ -28,7 +28,6 @@ enum class COMMAND_CODES : char {
 };
 
 void parseCommands(COMMAND_CODES cmd);
-bool waitForCommand(uint16_t timeout);
 void calibrateRange();
 void calibrateTouch();
 // bool doCalibrate(uint8_t adcPin, uint8_t touchPin, range_t* range);

@@ -96,40 +96,21 @@ void loop()
   }
 }
 
-bool waitForCommand(uint16_t timeout)
-{
-  byte recv[64] = {0};
-  uint8_t n     = RawHID.recv(recv, timeout);
-  if (n > 0)
-  {
-    parseCommands((COMMAND_CODES)recv[0]);
-    return false;
-  }
-  else
-  {
-    return true; // timeout occured
-  }
-}
-
 void parseCommands(COMMAND_CODES cmd)
 {
-  bool nextCmd  = false;
   byte send[64] = {0};
   send[0]       = 0xcc;
-  send[2]       = 0xff;
+  send[3]       = 0xff;
 
   switch (cmd)
   {
     case COMMAND_CODES::STRING_E:
     case COMMAND_CODES::STRING_G:
       if ((machineState == MACHINE_STATE::CALIB_RANGES) || (machineState == MACHINE_STATE::CALIB_TOUCH))
-      {
         send[1] = (byte)cmd;
-      }
       else
-      {
         send[1] = (byte)COMMAND_CODES::ERR_NOCMD;
-      }
+
       break;
 
     case COMMAND_CODES::CALIB_RANGES:
@@ -137,7 +118,6 @@ void parseCommands(COMMAND_CODES cmd)
       if (machineState == MACHINE_STATE::IDLE)
       {
         send[1]      = (byte)cmd;
-        nextCmd      = true;
         machineState = (cmd == COMMAND_CODES::CALIB_RANGES) ? MACHINE_STATE::CALIB_RANGES : MACHINE_STATE::CALIB_TOUCH;
       }
       else
@@ -145,11 +125,23 @@ void parseCommands(COMMAND_CODES cmd)
         send[1]      = (byte)COMMAND_CODES::ERR_NOCMD;
         machineState = MACHINE_STATE::IDLE;
       }
+
       break;
 
     case COMMAND_CODES::MEASURE:
-    case COMMAND_CODES::HELP:
       if (machineState == MACHINE_STATE::IDLE)
+      {
+        send[1]      = (byte)cmd;
+        machineState = MACHINE_STATE::MEASURING;
+      }
+      else
+      {
+        send[1] = (byte)COMMAND_CODES::ERR_NOCMD;
+      }
+      break;
+
+    case COMMAND_CODES::HELP:
+      if ((machineState == MACHINE_STATE::IDLE) || (machineState == MACHINE_STATE::CALIB_RANGES) || (machineState == MACHINE_STATE::CALIB_TOUCH))
       {
         send[1] = (byte)cmd;
       }
@@ -157,7 +149,6 @@ void parseCommands(COMMAND_CODES cmd)
       {
         send[1] = (byte)COMMAND_CODES::ERR_NOCMD;
       }
-      break;
 
     case COMMAND_CODES::VIEW:
       if ((machineState == MACHINE_STATE::IDLE) || (machineState == MACHINE_STATE::CALIB_RANGES) || (machineState == MACHINE_STATE::CALIB_TOUCH))
@@ -168,6 +159,7 @@ void parseCommands(COMMAND_CODES cmd)
       {
         send[1] = (byte)COMMAND_CODES::ERR_NOCMD;
       }
+      break;
 
     case COMMAND_CODES::EXIT:
       send[1]      = (byte)cmd;
@@ -178,16 +170,8 @@ void parseCommands(COMMAND_CODES cmd)
       send[1] = (byte)COMMAND_CODES::ERR_NOCMD;
       break;
   }
+  send[2] = (byte)machineState;
   RawHID.send(send, 64);
-
-  if (nextCmd)
-  {
-    if (waitForCommand(10000))
-    {
-      send[1] = (byte)COMMAND_CODES::ERR_TIMEOUT;
-      RawHID.send(send, 64);
-    }
-  }
 }
 
 void calibrateRange()
