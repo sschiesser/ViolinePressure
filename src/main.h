@@ -6,21 +6,22 @@
 
 enum class MACHINE_STATE : uint8_t {
   IDLE,
-  CALIBRATING_RANGE,
-  CALIBRATING_TOUCH,
+  CALIB_RANGES,
+  CALIB_TOUCH,
   MEASURING,
   ERROR
 };
 
 enum class COMMAND_CODES : char {
+  STRING_A     = 'a',
+  STRING_D     = 'd',
   STRING_E     = 'e',
   STRING_G     = 'g',
-  STRING_D     = 'd',
-  STRING_A     = 'a',
+  HELP         = 'h',
+  MEASURE      = 'm',
   CALIB_RANGES = 'r',
   CALIB_TOUCH  = 't',
-  MEASURE      = 'm',
-  HELP         = 'h',
+  VIEW         = 'v',
   EXIT         = 'x',
   ERR_NOCMD    = (char)0xff,
   ERR_TIMEOUT  = (char)0xfe

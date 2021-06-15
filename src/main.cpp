@@ -61,12 +61,12 @@ void loop()
     c = Serial.read();
     if (c == 'r')
     {
-      machineState = MACHINE_STATE::CALIBRATING_RANGE;
+      machineState = MACHINE_STATE::CALIB_RANGES;
       calibrateRange();
     }
     else if (c == 't')
     {
-      machineState = MACHINE_STATE::CALIBRATING_TOUCH;
+      machineState = MACHINE_STATE::CALIB_TOUCH;
       calibrateTouch();
     }
     else if (c == 'm')
@@ -122,19 +122,56 @@ void parseCommands(COMMAND_CODES cmd)
   {
     case COMMAND_CODES::STRING_E:
     case COMMAND_CODES::STRING_G:
-      send[1] = (byte)cmd;
+      if ((machineState == MACHINE_STATE::CALIB_RANGES) || (machineState == MACHINE_STATE::CALIB_TOUCH))
+      {
+        send[1] = (byte)cmd;
+      }
+      else
+      {
+        send[1] = (byte)COMMAND_CODES::ERR_NOCMD;
+      }
       break;
 
     case COMMAND_CODES::CALIB_RANGES:
     case COMMAND_CODES::CALIB_TOUCH:
-      send[1] = (byte)cmd;
-      nextCmd = true;
+      if (machineState == MACHINE_STATE::IDLE)
+      {
+        send[1]      = (byte)cmd;
+        nextCmd      = true;
+        machineState = (cmd == COMMAND_CODES::CALIB_RANGES) ? MACHINE_STATE::CALIB_RANGES : MACHINE_STATE::CALIB_TOUCH;
+      }
+      else
+      {
+        send[1]      = (byte)COMMAND_CODES::ERR_NOCMD;
+        machineState = MACHINE_STATE::IDLE;
+      }
       break;
 
     case COMMAND_CODES::MEASURE:
     case COMMAND_CODES::HELP:
+      if (machineState == MACHINE_STATE::IDLE)
+      {
+        send[1] = (byte)cmd;
+      }
+      else
+      {
+        send[1] = (byte)COMMAND_CODES::ERR_NOCMD;
+      }
+      break;
+
+    case COMMAND_CODES::VIEW:
+      if ((machineState == MACHINE_STATE::IDLE) || (machineState == MACHINE_STATE::CALIB_RANGES) || (machineState == MACHINE_STATE::CALIB_TOUCH))
+      {
+        send[1] = (byte)cmd;
+      }
+      else
+      {
+        send[1] = (byte)COMMAND_CODES::ERR_NOCMD;
+      }
+
     case COMMAND_CODES::EXIT:
-      send[1] = (byte)cmd;
+      send[1]      = (byte)cmd;
+      machineState = MACHINE_STATE::IDLE;
       break;
 
     default:
@@ -159,7 +196,7 @@ void calibrateRange()
 
   Serial.println("Calibrate pressure ranges.");
   displayHelp();
-  while (machineState == MACHINE_STATE::CALIBRATING_RANGE)
+  while (machineState == MACHINE_STATE::CALIB_RANGES)
   {
     while (!Serial.available())
       ;
@@ -236,7 +273,7 @@ void calibrateTouch()
 
   Serial.println("Calibrate touch thresholds.");
   displayHelp();
-  while (machineState == MACHINE_STATE::CALIBRATING_TOUCH)
+  while (machineState == MACHINE_STATE::CALIB_TOUCH)
   {
     while (!Serial.available())
       ;
@@ -439,7 +476,7 @@ void displayHelp()
                  "'m' : MEASURE string pressures (continuous)\n'v' : VIEW current calibration values\n"
                  "'h' : display HELP\n'x' : EXIT calibration or measuring modes\n");
   }
-  else if ((machineState == MACHINE_STATE::CALIBRATING_RANGE) || (machineState == MACHINE_STATE::CALIBRATING_TOUCH))
+  else if ((machineState == MACHINE_STATE::CALIB_RANGES) || (machineState == MACHINE_STATE::CALIB_TOUCH))
   {
     Serial.printf("'g': G string\n'e': E string\n'v': VIEW current calibrations\n'x': EXIT.\n");
   }
