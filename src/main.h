@@ -4,6 +4,8 @@
 #include "Arduino.h"
 #include "vString.h"
 
+void parseCommands(char cmd);
+bool waitForCommand(uint16_t timeout);
 void calibrateRange();
 void calibrateTouch();
 // bool doCalibrate(uint8_t adcPin, uint8_t touchPin, range_t* range);

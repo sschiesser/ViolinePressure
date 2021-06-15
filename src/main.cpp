@@ -49,15 +49,10 @@ void loop()
   */
 
   byte recv[64];
-  byte send[64] = {0};
-
   uint8_t n = RawHID.recv(recv, 0);
   if (n > 0)
   {
-    send[0] = 0xcc;
-    send[1] = recv[0];
-    send[2] = 0xff;
-    RawHID.send(send, 64);
+    parseCommands((char)recv[0]);
   }
 
   char c = 0;
@@ -97,6 +92,64 @@ void loop()
     {
       machineState = MACHINE_STATE::IDLE;
       displayHelp();
+    }
+  }
+}
+
+bool waitForCommand(uint16_t timeout)
+{
+  elapsedMillis tCount = 0;
+  byte recv[64]        = {0};
+  uint8_t n            = RawHID.recv(recv, timeout);
+  if (n > 0)
+  {
+    parseCommands((char)recv[0]);
+    return false;
+  }
+  else
+  {
+    return true; // timeout occured
+  }
+}
+
+void parseCommands(char cmd)
+{
+  bool nextCmd  = false;
+  byte send[64] = {0};
+  send[0]       = 0xcc;
+  send[2]       = 0xff;
+
+  switch (cmd)
+  {
+    case 'e':
+    case 'g':
+      send[1] = cmd;
+      break;
+
+    case 'r':
+    case 't':
+      send[1] = cmd;
+      nextCmd = true;
+      break;
+
+    case 'm':
+    case 'h':
+    case 'x':
+      send[1] = cmd;
+      break;
+
+    default:
+      send[1] = 0xff;
+      break;
+  }
+  RawHID.send(send, 64);
+
+  if (nextCmd)
+  {
+    if (waitForCommand(10000))
+    {
+      send[1] = 0xff;
+      RawHID.send(send, 64);
     }
   }
 }
