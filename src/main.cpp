@@ -52,7 +52,7 @@ void loop()
   uint8_t n = RawHID.recv(recv, 0);
   if (n > 0)
   {
-    parseCommands((char)recv[0]);
+    parseCommands((COMMAND_CODES)recv[0]);
   }
 
   char c = 0;
@@ -98,12 +98,11 @@ void loop()
 
 bool waitForCommand(uint16_t timeout)
 {
-  elapsedMillis tCount = 0;
-  byte recv[64]        = {0};
-  uint8_t n            = RawHID.recv(recv, timeout);
+  byte recv[64] = {0};
+  uint8_t n     = RawHID.recv(recv, timeout);
   if (n > 0)
   {
-    parseCommands((char)recv[0]);
+    parseCommands((COMMAND_CODES)recv[0]);
     return false;
   }
   else
@@ -112,7 +111,7 @@ bool waitForCommand(uint16_t timeout)
   }
 }
 
-void parseCommands(char cmd)
+void parseCommands(COMMAND_CODES cmd)
 {
   bool nextCmd  = false;
   byte send[64] = {0};
@@ -121,25 +120,25 @@ void parseCommands(char cmd)
 
   switch (cmd)
   {
-    case 'e':
-    case 'g':
-      send[1] = cmd;
+    case COMMAND_CODES::STRING_E:
+    case COMMAND_CODES::STRING_G:
+      send[1] = (byte)cmd;
       break;
 
-    case 'r':
-    case 't':
-      send[1] = cmd;
+    case COMMAND_CODES::CALIB_RANGES:
+    case COMMAND_CODES::CALIB_TOUCH:
+      send[1] = (byte)cmd;
       nextCmd = true;
       break;
 
-    case 'm':
-    case 'h':
-    case 'x':
-      send[1] = cmd;
+    case COMMAND_CODES::MEASURE:
+    case COMMAND_CODES::HELP:
+    case COMMAND_CODES::EXIT:
+      send[1] = (byte)cmd;
       break;
 
     default:
-      send[1] = 0xff;
+      send[1] = (byte)COMMAND_CODES::ERR_NOCMD;
       break;
   }
   RawHID.send(send, 64);
@@ -148,7 +147,7 @@ void parseCommands(char cmd)
   {
     if (waitForCommand(10000))
     {
-      send[1] = 0xff;
+      send[1] = (byte)COMMAND_CODES::ERR_TIMEOUT;
       RawHID.send(send, 64);
     }
   }
