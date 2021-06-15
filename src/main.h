@@ -1,8 +1,17 @@
 #ifndef INIT_H
 #define INIT_H
 
-#include "Arduino.h"
 #include "vString.h"
+#include <Arduino.h>
+#include <usb_rawhid.h>
+
+enum class HID_MESSAGES : uint8_t {
+  COMMAND      = 0xC0,
+  CALIB_RANGES = 0xD0,
+  CALIB_TOUCH  = 0xD1,
+  MEASURE      = 0xE0,
+  END          = 0xFF
+};
 
 enum class MACHINE_STATE : uint8_t {
   IDLE         = 0x00,
@@ -28,8 +37,8 @@ enum class COMMAND_CODES : char {
 };
 
 void parseCommands(COMMAND_CODES cmd);
-void calibrateRange();
-void calibrateTouch();
+// void calibrateRange(vString* str);
+// void calibrateTouch(vString* str);
 // bool doCalibrate(uint8_t adcPin, uint8_t touchPin, range_t* range);
 // bool checkCalib();
 void measure();

@@ -4,7 +4,6 @@
 #include <ADC_util.h>
 #include <Arduino.h>
 #include <EEPROM.h>
-#include <usb_rawhid.h>
 
 elapsedMillis gDetla, eDelta;
 ADC* adc      = new ADC(); // adc object;
@@ -55,75 +54,110 @@ void loop()
     parseCommands((COMMAND_CODES)recv[0]);
   }
 
-  char c = 0;
-  if (Serial.available())
-  {
-    c = Serial.read();
-    if (c == 'r')
-    {
-      machineState = MACHINE_STATE::CALIB_RANGES;
-      calibrateRange();
-    }
-    else if (c == 't')
-    {
-      machineState = MACHINE_STATE::CALIB_TOUCH;
-      calibrateTouch();
-    }
-    else if (c == 'm')
-    {
-      if (Gstr->adcCalDone && Estr->adcCalDone && Gstr->touchCalDone && Estr->touchCalDone)
-      {
-        machineState = MACHINE_STATE::MEASURING;
-        measure();
-      }
-      else
-      {
-        Serial.println("Please calibrate first!");
-        Gstr->viewCalibValues();
-        Estr->viewCalibValues();
-      }
-    }
-    else if (c == 'v')
-    {
-      Gstr->viewCalibValues();
-      Estr->viewCalibValues();
-    }
-    else if (c == 'h')
-    {
-      machineState = MACHINE_STATE::IDLE;
-      displayHelp();
-    }
-  }
+  // char c = 0;
+  // if (Serial.available())
+  // {
+  //   c = Serial.read();
+  //   if (c == 'r')
+  //   {
+  //     machineState = MACHINE_STATE::CALIB_RANGES;
+  //     calibrateRange();
+  //   }
+  //   else if (c == 't')
+  //   {
+  //     machineState = MACHINE_STATE::CALIB_TOUCH;
+  //     calibrateTouch();
+  //   }
+  //   else if (c == 'm')
+  //   {
+  //     if (Gstr->adcCalDone && Estr->adcCalDone && Gstr->touchCalDone && Estr->touchCalDone)
+  //     {
+  //       machineState = MACHINE_STATE::MEASURING;
+  //       measure();
+  //     }
+  //     else
+  //     {
+  //       Serial.println("Please calibrate first!");
+  //       Gstr->viewCalibValues();
+  //       Estr->viewCalibValues();
+  //     }
+  //   }
+  //   else if (c == 'v')
+  //   {
+  //     Gstr->viewCalibValues();
+  //     Estr->viewCalibValues();
+  //   }
+  //   else if (c == 'h')
+  //   {
+  //     machineState = MACHINE_STATE::IDLE;
+  //     displayHelp();
+  //   }
+  // }
 }
 
 void parseCommands(COMMAND_CODES cmd)
 {
   byte send[64] = {0};
-  send[0]       = 0xcc;
-  send[3]       = 0xff;
+  send[0]       = (byte)HID_MESSAGES::COMMAND;
+  send[3]       = (byte)HID_MESSAGES::END;
 
   switch (cmd)
   {
     case COMMAND_CODES::STRING_E:
     case COMMAND_CODES::STRING_G:
-      if ((machineState == MACHINE_STATE::CALIB_RANGES) || (machineState == MACHINE_STATE::CALIB_TOUCH))
+      if (machineState == MACHINE_STATE::CALIB_RANGES)
+      {
         send[1] = (byte)cmd;
+        send[2] = (byte)machineState;
+        RawHID.send(send, 64);
+        if (cmd == COMMAND_CODES::STRING_E)
+          Estr->calibrate(CALIB_TYPE::CALIB_RANGE, adc->adc0, &Estr->adcRange, &Estr->touchThresh);
+        else
+          Gstr->calibrate(CALIB_TYPE::CALIB_RANGE, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh);
+      }
+      else if (machineState == MACHINE_STATE::CALIB_TOUCH)
+      {
+        send[1] = (byte)cmd;
+        send[2] = (byte)machineState;
+        RawHID.send(send, 64);
+        if (cmd == COMMAND_CODES::STRING_E)
+          Estr->calibrate(CALIB_TYPE::CALIB_TOUCH, adc->adc0, &Estr->adcRange, &Estr->touchThresh);
+        else
+          Gstr->calibrate(CALIB_TYPE::CALIB_TOUCH, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh);
+      }
       else
+      {
         send[1] = (byte)COMMAND_CODES::ERR_NOCMD;
-
+        send[2] = (byte)machineState;
+        RawHID.send(send, 64);
+      }
       break;
 
     case COMMAND_CODES::CALIB_RANGES:
     case COMMAND_CODES::CALIB_TOUCH:
       if (machineState == MACHINE_STATE::IDLE)
       {
-        send[1]      = (byte)cmd;
-        machineState = (cmd == COMMAND_CODES::CALIB_RANGES) ? MACHINE_STATE::CALIB_RANGES : MACHINE_STATE::CALIB_TOUCH;
+        send[1] = (byte)cmd;
+        if (cmd == COMMAND_CODES::CALIB_RANGES)
+        {
+          machineState = MACHINE_STATE::CALIB_RANGES;
+          send[2]      = (byte)machineState;
+          RawHID.send(send, 64);
+        }
+        if (cmd == COMMAND_CODES::CALIB_TOUCH)
+        {
+          machineState = MACHINE_STATE::CALIB_TOUCH;
+          send[2]      = (byte)machineState;
+          RawHID.send(send, 64);
+          // calibrateTouch();
+        }
       }
       else
       {
         send[1]      = (byte)COMMAND_CODES::ERR_NOCMD;
         machineState = MACHINE_STATE::IDLE;
+        send[2]      = (byte)machineState;
+        RawHID.send(send, 64);
       }
 
       break;
@@ -133,10 +167,14 @@ void parseCommands(COMMAND_CODES cmd)
       {
         send[1]      = (byte)cmd;
         machineState = MACHINE_STATE::MEASURING;
+        send[2]      = (byte)machineState;
+        RawHID.send(send, 64);
       }
       else
       {
         send[1] = (byte)COMMAND_CODES::ERR_NOCMD;
+        send[2] = (byte)machineState;
+        RawHID.send(send, 64);
       }
       break;
 
@@ -144,184 +182,140 @@ void parseCommands(COMMAND_CODES cmd)
       if ((machineState == MACHINE_STATE::IDLE) || (machineState == MACHINE_STATE::CALIB_RANGES) || (machineState == MACHINE_STATE::CALIB_TOUCH))
       {
         send[1] = (byte)cmd;
+        send[2] = (byte)machineState;
+        RawHID.send(send, 64);
       }
       else
       {
         send[1] = (byte)COMMAND_CODES::ERR_NOCMD;
+        send[2] = (byte)machineState;
+        RawHID.send(send, 64);
       }
 
     case COMMAND_CODES::VIEW:
       if ((machineState == MACHINE_STATE::IDLE) || (machineState == MACHINE_STATE::CALIB_RANGES) || (machineState == MACHINE_STATE::CALIB_TOUCH))
       {
         send[1] = (byte)cmd;
+        send[2] = (byte)machineState;
+        RawHID.send(send, 64);
       }
       else
       {
         send[1] = (byte)COMMAND_CODES::ERR_NOCMD;
+        send[2] = (byte)machineState;
+        RawHID.send(send, 64);
       }
       break;
 
     case COMMAND_CODES::EXIT:
       send[1]      = (byte)cmd;
       machineState = MACHINE_STATE::IDLE;
+      send[2]      = (byte)machineState;
+      RawHID.send(send, 64);
       break;
 
     default:
       send[1] = (byte)COMMAND_CODES::ERR_NOCMD;
+      send[2] = (byte)machineState;
+      RawHID.send(send, 64);
       break;
   }
-  send[2] = (byte)machineState;
-  RawHID.send(send, 64);
 }
 
-void calibrateRange()
-{
-  char c = 0;
+// void calibrateRange(vString* str)
+// {
+// if (str->touchCalDone)
+// {
+// str->resetCalibValues(CALIB_TYPE::CALIB_RANGE);
+// str->saveToEeprom(CALIB_TYPE::CALIB_RANGE, (uint8_t*)&str->adcRange);
+// if (str->calibrate(CALIB_TYPE::CALIB_RANGE, adc->adc0, &str->adcRange, &str->touchThresh))
+// str->calibrate(CALIB_TYPE::CALIB_RANGE, adc->adc0, &str->adcRange, &str->touchThresh);
+//   Serial.print("Calibration OK! ");
+// else
+//   Serial.print("Calibration poor! ");
 
-  Serial.println("Calibrate pressure ranges.");
-  displayHelp();
-  while (machineState == MACHINE_STATE::CALIB_RANGES)
-  {
-    while (!Serial.available())
-      ;
+// Serial.printf("Values on E string: 0x%04x - 0x%04x\n", str->adcRange.min, str->adcRange.max);
+// if (str->adcCalDone) Estr->saveToEeprom(CALIB_TYPE::CALIB_RANGE, (uint8_t*)&str->adcRange);
+// displayHelp();
+// }
+// else
+// {
+//   Serial.println("Please calibrate the string touch thresholds first");
+// }
+// }
 
-    c = Serial.read();
-    if (c == 'e')
-    {
-      if (Estr->touchCalDone)
-      {
-        Serial.printf("Calibrating E string, press 'x' to finish (t: %d, a:%d)\n", Estr->touchPin, Estr->adcPin);
-        Estr->resetCalibValues(CALIB_TYPE::CALIB_RANGE);
-        Estr->saveToEeprom(CALIB_TYPE::CALIB_RANGE, (uint8_t*)&Estr->adcRange);
-        if (Estr->calibrate(CALIB_TYPE::CALIB_RANGE, adc->adc0, &Estr->adcRange, &Estr->touchThresh))
-          Serial.print("Calibration OK! ");
-        else
-          Serial.print("Calibration poor! ");
+// void calibrateTouch(vString* str)
+// {
+// char c = 0;
 
-        Serial.printf("Values on E string: 0x%04x - 0x%04x\n", Estr->adcRange.min, Estr->adcRange.max);
-        if (Estr->adcCalDone) Estr->saveToEeprom(CALIB_TYPE::CALIB_RANGE, (uint8_t*)&Estr->adcRange);
-        // displayHelp();
-      }
-      else
-      {
-        Serial.println("Please calibrate the string touch thresholds first");
-      }
-    }
-    else if (c == 'g')
-    {
-      if (Gstr->touchCalDone)
-      {
-        Serial.printf("Calibrating G string, press 'x' to finish (t: %d, a:%d)\n", Gstr->touchPin, Gstr->adcPin);
-        Gstr->resetCalibValues(CALIB_TYPE::CALIB_RANGE);
-        Gstr->saveToEeprom(CALIB_TYPE::CALIB_RANGE, (uint8_t*)&Gstr->adcRange);
-        if (Gstr->calibrate(CALIB_TYPE::CALIB_RANGE, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh))
-          Serial.print("Calibration OK! ");
-        else
-          Serial.print("Calibration poor! ");
+// Serial.println("Calibrate touch thresholds.");
+// displayHelp();
+// while (machineState == MACHINE_STATE::CALIB_TOUCH)
+// {
+//   str->calibrate(CALIB_TYPE::CALIB_TOUCH, adc->adc0, &str->adcRange, &str->touchThresh);
+//   while (!Serial.available())
+//     ;
 
-        Serial.printf("Values on G string: 0x%04x - 0x%04x\n", Gstr->adcRange.min, Gstr->adcRange.max);
-        if (Gstr->adcCalDone) Gstr->saveToEeprom(CALIB_TYPE::CALIB_RANGE, (uint8_t*)&Gstr->adcRange);
-        // displayHelp();
-      }
-      else
-      {
-        Serial.println("Please calibrate the string touch thresholds first");
-      }
-    }
-    else if (c == 'v')
-    {
-      Serial.println("Current calibration values");
-      Gstr->viewCalibValues();
-      Estr->viewCalibValues();
-      // displayHelp();
-    }
-    else if (c == 'x')
-    {
-      Serial.println("\nExiting calibration. Ranges:");
-      Serial.printf("G: %d - %d\nE: %d - %d\n\n", Gstr->adcRange.min, Gstr->adcRange.max, Estr->adcRange.min, Estr->adcRange.max);
-      machineState = MACHINE_STATE::IDLE;
-      // displayHelp();
-    }
-    else
-    {
-      Serial.println("Please choose a valid option");
-    }
+//   c = Serial.read();
+//   if (c == 'a')
+//   {
+//     Serial.println("A string not available yet!");
+//   }
+//   else if (c == 'd')
+//   {
+//     Serial.println("D string not available yet!");
+//   }
+//   else if (c == 'e')
+//   {
+//     Serial.printf("Calibrating E string...\nTouch the string at different places on different manners ('x' to finish (t: %d, a:%d))\n", Estr->touchPin, Estr->adcPin);
+//     Estr->resetCalibValues(CALIB_TYPE::CALIB_TOUCH);
+//     Estr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Estr->touchThresh);
+//     if (Estr->calibrate(CALIB_TYPE::CALIB_TOUCH, adc->adc0, &Estr->adcRange, &Estr->touchThresh))
+//       Serial.print("Calibration OK! ");
+//     else
+//       Serial.print("Calibration poor! ");
 
-    displayHelp();
-  }
-}
+//     Serial.printf("Thresholds on E string: 0x%04x - 0x%04x (avg: 0x%04x)\n", Estr->touchThresh.min, Estr->touchThresh.max, Estr->touchThresh.avg);
+//     if (Estr->touchCalDone) Estr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Estr->touchThresh);
 
-void calibrateTouch()
-{
-  char c = 0;
+//     displayHelp();
+//   }
+//   else if (c == 'g')
+//   {
+//     Serial.printf("Calibrating G string...\nTouch the string at different places on different manners ('x' to finish (t: %d, a:%d))\n", Gstr->touchPin, Gstr->adcPin);
+//     Gstr->resetCalibValues(CALIB_TYPE::CALIB_TOUCH);
+//     Gstr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Gstr->touchThresh);
+//     if (Gstr->calibrate(CALIB_TYPE::CALIB_TOUCH, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh))
+//       Serial.print("Calibration OK! ");
+//     else
+//       Serial.print("Calibration poor! ");
 
-  Serial.println("Calibrate touch thresholds.");
-  displayHelp();
-  while (machineState == MACHINE_STATE::CALIB_TOUCH)
-  {
-    while (!Serial.available())
-      ;
+//     Serial.printf("Thresholds on G string: 0x%04x - 0x%04x (avg: 0x%04x)\n", Gstr->touchThresh.min, Gstr->touchThresh.max, Gstr->touchThresh.avg);
+//     if (Gstr->touchCalDone) Gstr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Gstr->touchThresh);
 
-    c = Serial.read();
-    if (c == 'a')
-    {
-      Serial.println("A string not available yet!");
-    }
-    else if (c == 'd')
-    {
-      Serial.println("D string not available yet!");
-    }
-    else if (c == 'e')
-    {
-      Serial.printf("Calibrating E string...\nTouch the string at different places on different manners ('x' to finish (t: %d, a:%d))\n", Estr->touchPin, Estr->adcPin);
-      Estr->resetCalibValues(CALIB_TYPE::CALIB_TOUCH);
-      Estr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Estr->touchThresh);
-      if (Estr->calibrate(CALIB_TYPE::CALIB_TOUCH, adc->adc0, &Estr->adcRange, &Estr->touchThresh))
-        Serial.print("Calibration OK! ");
-      else
-        Serial.print("Calibration poor! ");
-
-      Serial.printf("Thresholds on E string: 0x%04x - 0x%04x (avg: 0x%04x)\n", Estr->touchThresh.min, Estr->touchThresh.max, Estr->touchThresh.avg);
-      if (Estr->touchCalDone) Estr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Estr->touchThresh);
-
-      displayHelp();
-    }
-    else if (c == 'g')
-    {
-      Serial.printf("Calibrating G string...\nTouch the string at different places on different manners ('x' to finish (t: %d, a:%d))\n", Gstr->touchPin, Gstr->adcPin);
-      Gstr->resetCalibValues(CALIB_TYPE::CALIB_TOUCH);
-      Gstr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Gstr->touchThresh);
-      if (Gstr->calibrate(CALIB_TYPE::CALIB_TOUCH, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh))
-        Serial.print("Calibration OK! ");
-      else
-        Serial.print("Calibration poor! ");
-
-      Serial.printf("Thresholds on G string: 0x%04x - 0x%04x (avg: 0x%04x)\n", Gstr->touchThresh.min, Gstr->touchThresh.max, Gstr->touchThresh.avg);
-      if (Gstr->touchCalDone) Gstr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Gstr->touchThresh);
-
-      displayHelp();
-    }
-    else if (c == 'v')
-    {
-      Serial.println("Current calibration values");
-      Gstr->viewCalibValues();
-      Estr->viewCalibValues();
-      displayHelp();
-    }
-    else if (c == 'x')
-    {
-      Serial.println("\nExiting calibration. Values:");
-      Serial.printf("G: adc -> %d - %d     touch -> %d\n", Gstr->adcRange.min, Gstr->adcRange.max, Gstr->touchThresh.avg);
-      Serial.printf("E: adc -> %d - %d     touch -> %d\n", Estr->adcRange.min, Estr->adcRange.max, Estr->touchThresh.avg);
-      machineState = MACHINE_STATE::IDLE;
-      displayHelp();
-    }
-    else
-    {
-      Serial.println("Please choose a valid option");
-    }
-  }
-}
+//     displayHelp();
+//   }
+//   else if (c == 'v')
+//   {
+//     Serial.println("Current calibration values");
+//     Gstr->viewCalibValues();
+//     Estr->viewCalibValues();
+//     displayHelp();
+//   }
+//   else if (c == 'x')
+//   {
+//     Serial.println("\nExiting calibration. Values:");
+//     Serial.printf("G: adc -> %d - %d     touch -> %d\n", Gstr->adcRange.min, Gstr->adcRange.max, Gstr->touchThresh.avg);
+//     Serial.printf("E: adc -> %d - %d     touch -> %d\n", Estr->adcRange.min, Estr->adcRange.max, Estr->touchThresh.avg);
+//     machineState = MACHINE_STATE::IDLE;
+//     displayHelp();
+//   }
+//   else
+//   {
+//     Serial.println("Please choose a valid option");
+//   }
+// }
+// }
 
 void measure()
 {

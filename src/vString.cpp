@@ -1,4 +1,5 @@
 #include "vString.h"
+#include "main.h"
 
 vString::vString(uint8_t tPin, uint8_t aPin, char strName, uint8_t strNumber)
 {
@@ -141,6 +142,8 @@ bool vString::calibrate(CALIB_TYPE type, ADC_Module* module, range_t* range, thr
 {
   bool doCal          = true;
   bool retVal         = false;
+  byte send[64]       = {0};
+  byte recv[64]       = {0};
   elapsedMillis delta = 0;
 
   switch (type)
@@ -190,18 +193,34 @@ bool vString::calibrate(CALIB_TYPE type, ADC_Module* module, range_t* range, thr
         uint32_t avg = (uint32_t)(sum / UINT8_MAX);
         if (avg > thresh->max) thresh->max = avg;
         if (avg < thresh->min) thresh->min = avg;
-        Serial.print(".");
 
-        if (Serial.available())
+        send[0] = (byte)HID_MESSAGES::CALIB_TOUCH;
+        send[1] = (byte)'.';
+        send[2] = (byte)MACHINE_STATE::CALIB_TOUCH;
+        RawHID.send(send, 64);
+
+        uint8_t n = RawHID.recv(recv, 0);
+        if (n > 0)
         {
-          char c = Serial.read();
-          if (c == 'x')
+          if (recv[0] == 'x')
           {
             doCal       = false;
             thresh->avg = (thresh->max + thresh->min) / 2;
             retVal      = checkCalStatus(CALIB_TYPE::CALIB_TOUCH);
           }
         }
+        // Serial.print(".");
+
+        // if (Serial.available())
+        // {
+        //   char c = Serial.read();
+        //   if (c == 'x')
+        //   {
+        //     doCal       = false;
+        //     thresh->avg = (thresh->max + thresh->min) / 2;
+        //     retVal      = checkCalStatus(CALIB_TYPE::CALIB_TOUCH);
+        //   }
+        // }
       }
       break;
     }

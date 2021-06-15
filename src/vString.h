@@ -1,9 +1,11 @@
 #ifndef VSTRING_H
 #define VSTRING_H
 
+// #include "main.h"
 #include <ADC.h>
 #include <Arduino.h>
 #include <EEPROM.h>
+#include <usb_rawhid.h>
 
 #define BUFFER_SIZE UINT8_MAX
 #define EEPROM_RANGE_ADDR 0
