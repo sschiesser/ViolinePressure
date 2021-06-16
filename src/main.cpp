@@ -121,9 +121,19 @@ void parseCommands(COMMAND_CODES cmd)
         send[2] = (byte)machineState;
         RawHID.send(send, 64);
         if (cmd == COMMAND_CODES::STRING_E)
+        {
+          Estr->resetCalibValues(CALIB_TYPE::CALIB_TOUCH);
+          Estr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Estr->touchThresh);
           Estr->calibrate(CALIB_TYPE::CALIB_TOUCH, adc->adc0, &Estr->adcRange, &Estr->touchThresh);
+          if (Estr->touchCalDone) Estr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Estr->touchThresh);
+        }
         else
+        {
+          Gstr->resetCalibValues(CALIB_TYPE::CALIB_TOUCH);
+          Gstr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Gstr->touchThresh);
           Gstr->calibrate(CALIB_TYPE::CALIB_TOUCH, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh);
+          if (Gstr->touchCalDone) Gstr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Gstr->touchThresh);
+        }
       }
       else
       {
