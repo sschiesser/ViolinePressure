@@ -194,11 +194,11 @@ bool vString::calibrate(CALIB_TYPE type, ADC_Module* module, range_t* range, thr
         if (avg > thresh->max) thresh->max = avg;
         if (avg < thresh->min) thresh->min = avg;
 
-        send[0] = (byte)HID_MESSAGES::CALIB_TOUCH;
+        send[0] = (byte)HID_NOTIFICATIONS::CALIB_TOUCH;
         // send[1] = (byte)((avg >> 8) & 0xff);
         // send[2] = (byte)(avg & 0xff);
         send[1] = (byte)'.';
-        send[2] = (byte)MACHINE_STATE::CALIB_TOUCH;
+        send[2] = (byte)MACHINE_STATE::CALIB_TOUCH_G;
         RawHID.send(send, 64);
 
         uint8_t n = RawHID.recv(recv, 0);
@@ -213,7 +213,7 @@ bool vString::calibrate(CALIB_TYPE type, ADC_Module* module, range_t* range, thr
         }
       }
 
-      send[0] = (byte)HID_MESSAGES::CALIB_TOUCH_DONE;
+      send[0] = (byte)HID_NOTIFICATIONS::CALIB_TOUCH_DONE;
       send[1] = (byte)((thresh->min >> 8) & 0xff);
       send[2] = (byte)(thresh->min & 0xff);
       send[3] = (byte)((thresh->max >> 8) & 0xff);

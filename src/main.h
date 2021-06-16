@@ -5,25 +5,10 @@
 #include <Arduino.h>
 #include <usb_rawhid.h>
 
-enum class HID_MESSAGES : uint8_t {
-  COMMAND      = 0xC0,
-  CALIB_RANGES = 0xD0,
-  CALIB_RANGES_DONE,
-  CALIB_TOUCH = 0xE0,
-  CALIB_TOUCH_DONE,
-  MEASURE = 0xF0,
-  END     = 0xFF
-};
-
-enum class MACHINE_STATE : uint8_t {
-  IDLE         = 0x00,
-  CALIB_RANGES = 0x10,
-  CALIB_TOUCH  = 0x11,
-  MEASURING    = 0x20,
-  ERROR        = 0xF0
-};
-
-enum class COMMAND_CODES : char {
+enum class HID_REQUESTS : uint8_t {
+  // request type headers (< 0x20)
+  COMMAND = 0x10,
+  // requests values (0x20 <= val <= 0x7E)
   STRING_A     = 'a',
   STRING_D     = 'd',
   STRING_E     = 'e',
@@ -34,11 +19,42 @@ enum class COMMAND_CODES : char {
   CALIB_TOUCH  = 't',
   VIEW         = 'v',
   EXIT         = 'x',
-  ERR_NOCMD    = (char)0xff,
-  ERR_TIMEOUT  = (char)0xfe
+  // request end delimiter
+  END = 0xFF,
 };
 
-void parseCommands(COMMAND_CODES cmd);
+enum class HID_NOTIFICATIONS : uint8_t {
+  // notification type headers
+  MEASUREMENT     = 0x00,
+  ACKNOWLEDGEMENT = 0x10,
+  // notification values
+  CALIB_RANGES      = 0x20,
+  CALIB_RANGES_DONE = 0x21,
+  CALIB_TOUCH       = 0x30,
+  CALIB_TOUCH_DONE  = 0x31,
+  MEASURE_REQ       = 0x40,
+  VIEW_VALUES       = 0x50,
+  STRING_E          = 0x60,
+  STRING_G          = 0x61,
+  STRING_D          = 0x62,
+  STRING_A          = 0x63,
+  ERROR_BADCMD      = 0xE0,
+  ERROR_TIMEOUT     = 0xE1,
+  // notification end delimiter
+  END = 0xFF
+};
+
+enum class MACHINE_STATE : uint8_t {
+  IDLE           = 0x00,
+  CALIB_RANGES_G = 0x10,
+  CALIB_RANGES_E = 0x11,
+  CALIB_TOUCH_G  = 0x20,
+  CALIB_TOUCH_E  = 0x21,
+  MEASURING      = 0x50,
+  ERROR          = 0xE0
+};
+
+MACHINE_STATE parseRequests(HID_REQUESTS* req);
 // void calibrateRange(vString* str);
 // void calibrateTouch(vString* str);
 // bool doCalibrate(uint8_t adcPin, uint8_t touchPin, range_t* range);

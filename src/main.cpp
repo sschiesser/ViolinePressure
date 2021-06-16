@@ -19,6 +19,7 @@ MACHINE_STATE machineState = MACHINE_STATE::IDLE;
 void setup()
 {
   pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, LOW);
 
   Serial.begin(115200);
   delay(1000);
@@ -40,197 +41,261 @@ void setup()
 
 void loop()
 {
-  /* Packets sent from Teensy to rawHID2OSC forwarder
-      - commands:
-        0xcc cmd 0xff
-      - measurements:
-        0x00 len TtimeH TtimeL StimeH StimeL Str1H Str1L Str2H Str2L Str3H Str3L Str4H Str4L 0xff
+  /* Packets sent from host to Teensy (requests)
+      - request len req1 req2 req3 ... end
+  */
+  /* Packets sent from Teensy to host (notifications)
+      - acknowledgement len ack1 ack2 ack3 ... m_state end
+      OR
+      - measurement len meas1 meas2 meas3 ... end
+        measurement values should follow the scheme:
+        '0x00 len TtimeH TtimeL StimeH StimeL Str1H Str1L Str2H Str2L Str3H Str3L Str4H Str4L 0xff'
   */
 
-  byte recv[64];
-  uint8_t n = RawHID.recv(recv, 0);
+  HID_REQUESTS req[64];
+  uint8_t n = RawHID.recv(req, 0);
   if (n > 0)
   {
-    parseCommands((COMMAND_CODES)recv[0]);
+    parseRequests(req);
+    delay(200);
+    digitalWrite(LED_BUILTIN, LOW);
   }
-
-  // char c = 0;
-  // if (Serial.available())
-  // {
-  //   c = Serial.read();
-  //   if (c == 'r')
-  //   {
-  //     machineState = MACHINE_STATE::CALIB_RANGES;
-  //     calibrateRange();
-  //   }
-  //   else if (c == 't')
-  //   {
-  //     machineState = MACHINE_STATE::CALIB_TOUCH;
-  //     calibrateTouch();
-  //   }
-  //   else if (c == 'm')
-  //   {
-  //     if (Gstr->adcCalDone && Estr->adcCalDone && Gstr->touchCalDone && Estr->touchCalDone)
-  //     {
-  //       machineState = MACHINE_STATE::MEASURING;
-  //       measure();
-  //     }
-  //     else
-  //     {
-  //       Serial.println("Please calibrate first!");
-  //       Gstr->viewCalibValues();
-  //       Estr->viewCalibValues();
-  //     }
-  //   }
-  //   else if (c == 'v')
-  //   {
-  //     Gstr->viewCalibValues();
-  //     Estr->viewCalibValues();
-  //   }
-  //   else if (c == 'h')
-  //   {
-  //     machineState = MACHINE_STATE::IDLE;
-  //     displayHelp();
-  //   }
-  // }
 }
 
-void parseCommands(COMMAND_CODES cmd)
+/* 
+  When a request is received, always send an acknowledgement of it, followed by either requested values (same packet) or measurement values (different packets continuous)
+*/
+MACHINE_STATE parseRequests(HID_REQUESTS* req)
 {
-  byte send[64] = {0};
-  send[0]       = (byte)HID_MESSAGES::COMMAND;
-  send[3]       = (byte)HID_MESSAGES::END;
+  bool msgFormat = false;
+  uint8_t len, pos;
+  MACHINE_STATE retVal = MACHINE_STATE::ERROR; //machineState;
 
-  switch (cmd)
+  len = (uint8_t)req[1];
+  pos = (uint8_t)req[1] + 1;
+  if ((req[0] == HID_REQUESTS::COMMAND) &&
+      (req[pos] == HID_REQUESTS::END) &&
+      (len != 0))
   {
-    case COMMAND_CODES::STRING_E:
-    case COMMAND_CODES::STRING_G:
-      if (machineState == MACHINE_STATE::CALIB_RANGES)
-      {
-        send[1] = (byte)cmd;
-        send[2] = (byte)machineState;
-        RawHID.send(send, 64);
-        if (cmd == COMMAND_CODES::STRING_E)
-          Estr->calibrate(CALIB_TYPE::CALIB_RANGE, adc->adc0, &Estr->adcRange, &Estr->touchThresh);
-        else
-          Gstr->calibrate(CALIB_TYPE::CALIB_RANGE, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh);
-      }
-      else if (machineState == MACHINE_STATE::CALIB_TOUCH)
-      {
-        send[1] = (byte)cmd;
-        send[2] = (byte)machineState;
-        RawHID.send(send, 64);
-        if (cmd == COMMAND_CODES::STRING_E)
-        {
-          Estr->resetCalibValues(CALIB_TYPE::CALIB_TOUCH);
-          Estr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Estr->touchThresh);
-          Estr->calibrate(CALIB_TYPE::CALIB_TOUCH, adc->adc0, &Estr->adcRange, &Estr->touchThresh);
-          if (Estr->touchCalDone) Estr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Estr->touchThresh);
-        }
-        else
-        {
-          Gstr->resetCalibValues(CALIB_TYPE::CALIB_TOUCH);
-          Gstr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Gstr->touchThresh);
-          Gstr->calibrate(CALIB_TYPE::CALIB_TOUCH, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh);
-          if (Gstr->touchCalDone) Gstr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Gstr->touchThresh);
-        }
-      }
-      else
-      {
-        send[1] = (byte)COMMAND_CODES::ERR_NOCMD;
-        send[2] = (byte)machineState;
-        RawHID.send(send, 64);
-      }
-      break;
-
-    case COMMAND_CODES::CALIB_RANGES:
-    case COMMAND_CODES::CALIB_TOUCH:
-      if (machineState == MACHINE_STATE::IDLE)
-      {
-        send[1] = (byte)cmd;
-        if (cmd == COMMAND_CODES::CALIB_RANGES)
-        {
-          machineState = MACHINE_STATE::CALIB_RANGES;
-          send[2]      = (byte)machineState;
-          RawHID.send(send, 64);
-        }
-        if (cmd == COMMAND_CODES::CALIB_TOUCH)
-        {
-          machineState = MACHINE_STATE::CALIB_TOUCH;
-          send[2]      = (byte)machineState;
-          RawHID.send(send, 64);
-          // calibrateTouch();
-        }
-      }
-      else
-      {
-        send[1]      = (byte)COMMAND_CODES::ERR_NOCMD;
-        machineState = MACHINE_STATE::IDLE;
-        send[2]      = (byte)machineState;
-        RawHID.send(send, 64);
-      }
-
-      break;
-
-    case COMMAND_CODES::MEASURE:
-      if (machineState == MACHINE_STATE::IDLE)
-      {
-        send[1]      = (byte)cmd;
-        machineState = MACHINE_STATE::MEASURING;
-        send[2]      = (byte)machineState;
-        RawHID.send(send, 64);
-      }
-      else
-      {
-        send[1] = (byte)COMMAND_CODES::ERR_NOCMD;
-        send[2] = (byte)machineState;
-        RawHID.send(send, 64);
-      }
-      break;
-
-    case COMMAND_CODES::HELP:
-      if ((machineState == MACHINE_STATE::IDLE) || (machineState == MACHINE_STATE::CALIB_RANGES) || (machineState == MACHINE_STATE::CALIB_TOUCH))
-      {
-        send[1] = (byte)cmd;
-        send[2] = (byte)machineState;
-        RawHID.send(send, 64);
-      }
-      else
-      {
-        send[1] = (byte)COMMAND_CODES::ERR_NOCMD;
-        send[2] = (byte)machineState;
-        RawHID.send(send, 64);
-      }
-
-    case COMMAND_CODES::VIEW:
-      if ((machineState == MACHINE_STATE::IDLE) || (machineState == MACHINE_STATE::CALIB_RANGES) || (machineState == MACHINE_STATE::CALIB_TOUCH))
-      {
-        send[1] = (byte)cmd;
-        send[2] = (byte)machineState;
-        RawHID.send(send, 64);
-      }
-      else
-      {
-        send[1] = (byte)COMMAND_CODES::ERR_NOCMD;
-        send[2] = (byte)machineState;
-        RawHID.send(send, 64);
-      }
-      break;
-
-    case COMMAND_CODES::EXIT:
-      send[1]      = (byte)cmd;
-      machineState = MACHINE_STATE::IDLE;
-      send[2]      = (byte)machineState;
-      RawHID.send(send, 64);
-      break;
-
-    default:
-      send[1] = (byte)COMMAND_CODES::ERR_NOCMD;
-      send[2] = (byte)machineState;
-      RawHID.send(send, 64);
-      break;
+    msgFormat = true;
   }
+
+  /* Request format is matching the expectations: we can parse the message */
+  if (msgFormat)
+  {
+    uint8_t notifLen  = 0;
+    uint8_t notif[64] = {0};
+    notif[0]          = (uint8_t)HID_NOTIFICATIONS::ACKNOWLEDGEMENT;
+
+    switch ((HID_REQUESTS)req[2])
+    {
+      case HID_REQUESTS::MEASURE:
+        notif[1]            = 3;
+        notif[2]            = (uint8_t)HID_NOTIFICATIONS::MEASURE_REQ;
+        notif[3]            = (uint8_t)machineState;
+        notif[notif[1] + 1] = (uint8_t)HID_NOTIFICATIONS::END;
+        retVal              = MACHINE_STATE::MEASURING;
+        break;
+
+      case HID_REQUESTS::CALIB_RANGES:
+        notif[1]            = 4;
+        notif[2]            = (uint8_t)HID_NOTIFICATIONS::CALIB_RANGES;
+        notif[4]            = (uint8_t)machineState;
+        notif[notif[1] + 1] = (uint8_t)HID_NOTIFICATIONS::END;
+        if (req[3] == HID_REQUESTS::STRING_G)
+        {
+          notif[3] = (uint8_t)HID_NOTIFICATIONS::STRING_G;
+          retVal   = MACHINE_STATE::CALIB_RANGES_G;
+        }
+        else if (req[3] == HID_REQUESTS::STRING_E)
+        {
+          notif[3] = (uint8_t)HID_NOTIFICATIONS::STRING_E;
+          retVal   = MACHINE_STATE::CALIB_RANGES_E;
+        }
+        else
+        {
+          notif[1]            = 3;
+          notif[2]            = (uint8_t)HID_NOTIFICATIONS::ERROR_BADCMD;
+          notif[3]            = (uint8_t)machineState;
+          notif[notif[1] + 1] = (uint8_t)HID_NOTIFICATIONS::END;
+        }
+        break;
+
+      case HID_REQUESTS::CALIB_TOUCH:
+        notifLen = 3;
+        notif[1] = notifLen;
+        notif[2] = (uint8_t)HID_NOTIFICATIONS::CALIB_TOUCH;
+        notif[3] = (uint8_t)machineState;
+        notif[4] = (uint8_t)HID_NOTIFICATIONS::END;
+        if (req[3] == HID_REQUESTS::STRING_G)
+          retVal = MACHINE_STATE::CALIB_TOUCH_G;
+        else if (req[3] == HID_REQUESTS::STRING_E)
+          retVal = MACHINE_STATE::CALIB_TOUCH_E;
+        else
+          notif[2] = (uint8_t)HID_NOTIFICATIONS::ERROR_BADCMD;
+        break;
+
+      case HID_REQUESTS::VIEW:
+        break;
+
+      case HID_REQUESTS::EXIT:
+        break;
+
+      default:
+        digitalWrite(LED_BUILTIN, HIGH);
+        notif[1] = 3;
+        notif[2] = (uint8_t)HID_NOTIFICATIONS::ERROR_BADCMD;
+        notif[3] = (uint8_t)machineState;
+        notif[4] = (uint8_t)HID_NOTIFICATIONS::END;
+        break;
+    }
+
+    RawHID.send(notif, 50);
+  }
+
+  return retVal;
 }
+
+//   case HID_REQUESTS::STRING_E:
+//   case HID_REQUESTS::STRING_G:
+//     if (machineState == MACHINE_STATE::CALIB_RANGES)
+//     {
+//       send[1] = (byte)cmd;
+//       send[2] = (byte)machineState;
+//       RawHID.send(send, 64);
+//       if (cmd == HID_REQUESTS::STRING_E)
+//         Estr->calibrate(CALIB_TYPE::CALIB_RANGE, adc->adc0, &Estr->adcRange, &Estr->touchThresh);
+//       else
+//         Gstr->calibrate(CALIB_TYPE::CALIB_RANGE, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh);
+//     }
+//     else if (machineState == MACHINE_STATE::CALIB_TOUCH)
+//     {
+//       send[1] = (byte)cmd;
+//       send[2] = (byte)machineState;
+//       RawHID.send(send, 64);
+//       if (cmd == HID_REQUESTS::STRING_E)
+//       {
+//         Estr->resetCalibValues(CALIB_TYPE::CALIB_TOUCH);
+//         Estr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Estr->touchThresh);
+//         Estr->calibrate(CALIB_TYPE::CALIB_TOUCH, adc->adc0, &Estr->adcRange, &Estr->touchThresh);
+//         if (Estr->touchCalDone) Estr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Estr->touchThresh);
+//       }
+//       else
+//       {
+//         Gstr->resetCalibValues(CALIB_TYPE::CALIB_TOUCH);
+//         Gstr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Gstr->touchThresh);
+//         Gstr->calibrate(CALIB_TYPE::CALIB_TOUCH, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh);
+//         if (Gstr->touchCalDone) Gstr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Gstr->touchThresh);
+//       }
+//     }
+//     else
+//     {
+//       send[1] = (byte)HID_REQUESTS::ERR_NOCMD;
+//       send[2] = (byte)machineState;
+//       RawHID.send(send, 64);
+//     }
+//     break;
+
+//   case HID_REQUESTS::CALIB_RANGES:
+//   case HID_REQUESTS::CALIB_TOUCH:
+//     if (machineState == MACHINE_STATE::IDLE)
+//     {
+//       send[1] = (byte)cmd;
+//       if (cmd == HID_REQUESTS::CALIB_RANGES)
+//       {
+//         machineState = MACHINE_STATE::CALIB_RANGES;
+//         send[2]      = (byte)machineState;
+//         RawHID.send(send, 64);
+//       }
+//       if (cmd == HID_REQUESTS::CALIB_TOUCH)
+//       {
+//         machineState = MACHINE_STATE::CALIB_TOUCH;
+//         send[2]      = (byte)machineState;
+//         RawHID.send(send, 64);
+//         // calibrateTouch();
+//       }
+//     }
+//     else
+//     {
+//       send[1]      = (byte)HID_REQUESTS::ERR_NOCMD;
+//       machineState = MACHINE_STATE::IDLE;
+//       send[2]      = (byte)machineState;
+//       RawHID.send(send, 64);
+//     }
+
+//     break;
+
+//   case HID_REQUESTS::MEASURE:
+//     if (machineState == MACHINE_STATE::IDLE)
+//     {
+//       send[1]      = (byte)cmd;
+//       machineState = MACHINE_STATE::MEASURING;
+//       send[2]      = (byte)machineState;
+//       RawHID.send(send, 64);
+//     }
+//     else
+//     {
+//       send[1] = (byte)HID_REQUESTS::ERR_NOCMD;
+//       send[2] = (byte)machineState;
+//       RawHID.send(send, 64);
+//     }
+//     break;
+
+//   case HID_REQUESTS::HELP:
+//     if ((machineState == MACHINE_STATE::IDLE) || (machineState == MACHINE_STATE::CALIB_RANGES) || (machineState == MACHINE_STATE::CALIB_TOUCH))
+//     {
+//       send[1] = (byte)cmd;
+//       send[2] = (byte)machineState;
+//       RawHID.send(send, 64);
+//     }
+//     else
+//     {
+//       send[1] = (byte)HID_REQUESTS::ERR_NOCMD;
+//       send[2] = (byte)machineState;
+//       RawHID.send(send, 64);
+//     }
+
+//   case HID_REQUESTS::VIEW:
+//     if ((machineState == MACHINE_STATE::IDLE) || (machineState == MACHINE_STATE::CALIB_RANGES) || (machineState == MACHINE_STATE::CALIB_TOUCH))
+//     {
+//       send[1]  = (byte)cmd;
+//       send[2]  = (byte)((Gstr->adcRange.min >> 8) & 0xff);
+//       send[3]  = (byte)(Gstr->adcRange.min & 0xff);
+//       send[4]  = (byte)((Gstr->adcRange.max >> 8) & 0xff);
+//       send[5]  = (byte)(Gstr->adcRange.max & 0xff);
+//       send[6]  = (byte)((Gstr->touchThresh.avg >> 8) & 0xff);
+//       send[7]  = (byte)(Gstr->touchThresh.avg & 0xff);
+//       send[8]  = (byte)((Estr->adcRange.min >> 8) & 0xff);
+//       send[9]  = (byte)(Estr->adcRange.min & 0xff);
+//       send[10] = (byte)((Estr->adcRange.max >> 8) & 0xff);
+//       send[11] = (byte)(Estr->adcRange.max & 0xff);
+//       send[12] = (byte)((Estr->touchThresh.avg >> 8) & 0xff);
+//       send[13] = (byte)(Estr->touchThresh.avg & 0xff);
+//       send[14] = (byte)machineState;
+//       RawHID.send(send, 64);
+//     }
+//     else
+//     {
+//       send[1] = (byte)HID_REQUESTS::ERR_NOCMD;
+//       send[2] = (byte)machineState;
+//       RawHID.send(send, 64);
+//     }
+//     break;
+
+//   case HID_REQUESTS::EXIT:
+//     send[1]      = (byte)cmd;
+//     machineState = MACHINE_STATE::IDLE;
+//     send[2]      = (byte)machineState;
+//     RawHID.send(send, 64);
+//     break;
+
+//   default:
+//     send[1] = (byte)HID_REQUESTS::ERR_NOCMD;
+//     send[2] = (byte)machineState;
+//     RawHID.send(send, 64);
+//     break;
+// }
+// }
 
 // void calibrateRange(vString* str)
 // {
@@ -464,7 +529,7 @@ void displayHelp()
                  "'m' : MEASURE string pressures (continuous)\n'v' : VIEW current calibration values\n"
                  "'h' : display HELP\n'x' : EXIT calibration or measuring modes\n");
   }
-  else if ((machineState == MACHINE_STATE::CALIB_RANGES) || (machineState == MACHINE_STATE::CALIB_TOUCH))
+  else if ((machineState == MACHINE_STATE::CALIB_RANGES_G) || (machineState == MACHINE_STATE::CALIB_TOUCH_G))
   {
     Serial.printf("'g': G string\n'e': E string\n'v': VIEW current calibrations\n'x': EXIT.\n");
   }
