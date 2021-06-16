@@ -46,10 +46,12 @@ enum class HID_NOTIFICATIONS : uint8_t {
 
 enum class MACHINE_STATE : uint8_t {
   IDLE           = 0x00,
-  CALIB_RANGES_G = 0x10,
-  CALIB_RANGES_E = 0x11,
-  CALIB_TOUCH_G  = 0x20,
-  CALIB_TOUCH_E  = 0x21,
+  CALIB_RANGES   = 0x10,
+  CALIB_RANGES_G = 0x11,
+  CALIB_RANGES_E = 0x12,
+  CALIB_TOUCH    = 0x20,
+  CALIB_TOUCH_G  = 0x21,
+  CALIB_TOUCH_E  = 0x22,
   MEASURING      = 0x50,
   ERROR          = 0xE0
 };

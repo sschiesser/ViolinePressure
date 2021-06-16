@@ -39,26 +39,49 @@ void setup()
   displayHelp();
 }
 
+/* Packets sent from host to Teensy (requests)
+    - request len req1 req2 req3 ... end
+*/
+/* Packets sent from Teensy to host (notifications)
+    - acknowledgement len ack1 ack2 ack3 ... m_state end
+      OR
+    - measurement len meas1 meas2 meas3 ... end measurement values should follow the scheme:
+      '0x00 len TtimeH TtimeL StimeH StimeL Str1H Str1L Str2H Str2L Str3H Str3L Str4H Str4L 0xff'
+*/
 void loop()
 {
-  /* Packets sent from host to Teensy (requests)
-      - request len req1 req2 req3 ... end
-  */
-  /* Packets sent from Teensy to host (notifications)
-      - acknowledgement len ack1 ack2 ack3 ... m_state end
-      OR
-      - measurement len meas1 meas2 meas3 ... end
-        measurement values should follow the scheme:
-        '0x00 len TtimeH TtimeL StimeH StimeL Str1H Str1L Str2H Str2L Str3H Str3L Str4H Str4L 0xff'
-  */
 
   HID_REQUESTS req[64];
   uint8_t n = RawHID.recv(req, 0);
   if (n > 0)
   {
-    parseRequests(req);
-    delay(200);
-    digitalWrite(LED_BUILTIN, LOW);
+    machineState = parseRequests(req);
+  }
+  switch (machineState)
+  {
+    case MACHINE_STATE::CALIB_TOUCH_E:
+      Estr->resetCalibValues(CALIB_TYPE::CALIB_TOUCH);
+      Estr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Estr->touchThresh);
+      Estr->calibrate(CALIB_TYPE::CALIB_TOUCH, adc->adc0, &Estr->adcRange, &Estr->touchThresh);
+      machineState = MACHINE_STATE::IDLE;
+      if (Estr->touchCalDone)
+        Estr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Estr->touchThresh);
+      break;
+
+    case MACHINE_STATE::CALIB_TOUCH_G:
+      break;
+
+    case MACHINE_STATE::CALIB_RANGES_E:
+      break;
+
+    case MACHINE_STATE::CALIB_RANGES_G:
+      break;
+
+    case MACHINE_STATE::MEASURING:
+      break;
+
+    default:
+      break;
   }
 }
 
@@ -75,7 +98,7 @@ MACHINE_STATE parseRequests(HID_REQUESTS* req)
   pos = (uint8_t)req[1] + 1;
   if ((req[0] == HID_REQUESTS::COMMAND) &&
       (req[pos] == HID_REQUESTS::END) &&
-      (len != 0))
+      (len > 0))
   {
     msgFormat = true;
   }
@@ -142,7 +165,6 @@ MACHINE_STATE parseRequests(HID_REQUESTS* req)
         break;
 
       default:
-        digitalWrite(LED_BUILTIN, HIGH);
         notif[1] = 3;
         notif[2] = (uint8_t)HID_NOTIFICATIONS::ERROR_BADCMD;
         notif[3] = (uint8_t)machineState;

@@ -142,8 +142,8 @@ bool vString::calibrate(CALIB_TYPE type, ADC_Module* module, range_t* range, thr
 {
   bool doCal          = true;
   bool retVal         = false;
-  byte send[64]       = {0};
-  byte recv[64]       = {0};
+  uint8_t send[64]    = {0};
+  uint8_t recv[64]    = {0};
   elapsedMillis delta = 0;
 
   switch (type)
@@ -194,33 +194,46 @@ bool vString::calibrate(CALIB_TYPE type, ADC_Module* module, range_t* range, thr
         if (avg > thresh->max) thresh->max = avg;
         if (avg < thresh->min) thresh->min = avg;
 
-        send[0] = (byte)HID_NOTIFICATIONS::CALIB_TOUCH;
+        send[0] = (uint8_t)HID_NOTIFICATIONS::CALIB_TOUCH;
         // send[1] = (byte)((avg >> 8) & 0xff);
         // send[2] = (byte)(avg & 0xff);
-        send[1] = (byte)'.';
-        send[2] = (byte)MACHINE_STATE::CALIB_TOUCH_G;
+        send[1]           = 6;
+        send[2]           = ((thresh->min >> 8) & 0xff);
+        send[3]           = (thresh->min & 0xff);
+        send[4]           = ((thresh->max >> 8) & 0xff);
+        send[5]           = (thresh->max & 0xff);
+        send[6]           = (uint8_t)MACHINE_STATE::CALIB_TOUCH_G;
+        send[send[1] + 1] = (uint8_t)HID_NOTIFICATIONS::END;
         RawHID.send(send, 64);
 
         uint8_t n = RawHID.recv(recv, 0);
         if (n > 0)
         {
-          if (recv[0] == 'x')
+          uint8_t len = recv[1];
+          uint8_t pos = recv[1] + 1;
+          if ((recv[0] == (uint8_t)HID_REQUESTS::COMMAND) &&
+              (recv[pos] == (uint8_t)HID_REQUESTS::END) &&
+              (recv[2] == (uint8_t)HID_REQUESTS::EXIT) &&
+              len > 0)
           {
             doCal       = false;
             thresh->avg = (thresh->max + thresh->min) / 2;
             retVal      = checkCalStatus(CALIB_TYPE::CALIB_TOUCH);
           }
         }
-      }
+      } // while(doCal)
 
-      send[0] = (byte)HID_NOTIFICATIONS::CALIB_TOUCH_DONE;
-      send[1] = (byte)((thresh->min >> 8) & 0xff);
-      send[2] = (byte)(thresh->min & 0xff);
-      send[3] = (byte)((thresh->max >> 8) & 0xff);
-      send[4] = (byte)(thresh->max & 0xff);
-      send[5] = (byte)((thresh->avg >> 8) & 0xff);
-      send[6] = (byte)(thresh->avg & 0xff);
-      send[7] = (byte)retVal;
+      send[0]           = (uint8_t)HID_NOTIFICATIONS::CALIB_TOUCH_DONE;
+      send[1]           = 8;
+      send[2]           = ((thresh->min >> 8) & 0xff);
+      send[3]           = (thresh->min & 0xff);
+      send[4]           = ((thresh->max >> 8) & 0xff);
+      send[5]           = (thresh->max & 0xff);
+      send[6]           = ((thresh->avg >> 8) & 0xff);
+      send[7]           = (thresh->avg & 0xff);
+      send[8]           = retVal;
+      send[9]           = (uint8_t)MACHINE_STATE::CALIB_TOUCH_E;
+      send[send[1] + 1] = (uint8_t)HID_NOTIFICATIONS::END;
       RawHID.send(send, 64);
       break;
     }
