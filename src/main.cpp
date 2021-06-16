@@ -69,6 +69,12 @@ void loop()
       break;
 
     case MACHINE_STATE::CALIB_TOUCH_G:
+      Gstr->resetCalibValues(CALIB_TYPE::CALIB_TOUCH);
+      Gstr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Gstr->touchThresh);
+      Gstr->calibrate(CALIB_TYPE::CALIB_TOUCH, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh);
+      machineState = MACHINE_STATE::IDLE;
+      if (Gstr->touchCalDone)
+        Gstr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Gstr->touchThresh);
       break;
 
     case MACHINE_STATE::CALIB_RANGES_E:

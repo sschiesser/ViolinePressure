@@ -13,6 +13,7 @@ enum class HID_REQUESTS : uint8_t {
   STRING_D     = 'd',
   STRING_E     = 'e',
   STRING_G     = 'g',
+  STRING_NONE  = 0xe0,
   HELP         = 'h',
   MEASURE      = 'm',
   CALIB_RANGES = 'r',
