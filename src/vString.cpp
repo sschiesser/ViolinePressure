@@ -190,11 +190,13 @@ bool vString::calibrate(CALIB_TYPE type, ADC_Module* module, range_t* range, thr
           touchBuf[i] = touchRead(touchPin);
           sum += touchBuf[i];
         }
-        uint32_t avg = (uint32_t)(sum / UINT8_MAX);
+        uint16_t avg = (uint16_t)(sum / 50);
         if (avg > thresh->max) thresh->max = avg;
         if (avg < thresh->min) thresh->min = avg;
 
         send[0] = (byte)HID_MESSAGES::CALIB_TOUCH;
+        // send[1] = (byte)((avg >> 8) & 0xff);
+        // send[2] = (byte)(avg & 0xff);
         send[1] = (byte)'.';
         send[2] = (byte)MACHINE_STATE::CALIB_TOUCH;
         RawHID.send(send, 64);
@@ -212,13 +214,13 @@ bool vString::calibrate(CALIB_TYPE type, ADC_Module* module, range_t* range, thr
       }
 
       send[0] = (byte)HID_MESSAGES::CALIB_TOUCH_DONE;
-      send[1] = (byte)retVal;
-      send[2] = (byte)((thresh->min >> 8) & 0xff);
-      send[3] = (byte)(thresh->min & 0xff);
-      send[4] = (byte)((thresh->max >> 8) & 0xff);
-      send[5] = (byte)(thresh->max & 0xff);
-      send[6] = (byte)((thresh->avg >> 8) & 0xff);
-      send[7] = (byte)(thresh->avg & 0xff);
+      send[1] = (byte)((thresh->min >> 8) & 0xff);
+      send[2] = (byte)(thresh->min & 0xff);
+      send[3] = (byte)((thresh->max >> 8) & 0xff);
+      send[4] = (byte)(thresh->max & 0xff);
+      send[5] = (byte)((thresh->avg >> 8) & 0xff);
+      send[6] = (byte)(thresh->avg & 0xff);
+      send[7] = (byte)retVal;
       RawHID.send(send, 64);
       break;
     }
