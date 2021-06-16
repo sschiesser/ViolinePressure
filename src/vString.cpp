@@ -185,7 +185,7 @@ bool vString::calibrate(CALIB_TYPE type, ADC_Module* module, range_t* range, thr
       while (doCal)
       {
         uint32_t sum = 0;
-        for (uint8_t i = 0; i < UINT8_MAX; i++)
+        for (uint8_t i = 0; i < 50; i++)
         {
           touchBuf[i] = touchRead(touchPin);
           sum += touchBuf[i];
@@ -209,19 +209,17 @@ bool vString::calibrate(CALIB_TYPE type, ADC_Module* module, range_t* range, thr
             retVal      = checkCalStatus(CALIB_TYPE::CALIB_TOUCH);
           }
         }
-        // Serial.print(".");
-
-        // if (Serial.available())
-        // {
-        //   char c = Serial.read();
-        //   if (c == 'x')
-        //   {
-        //     doCal       = false;
-        //     thresh->avg = (thresh->max + thresh->min) / 2;
-        //     retVal      = checkCalStatus(CALIB_TYPE::CALIB_TOUCH);
-        //   }
-        // }
       }
+
+      send[0] = (byte)HID_MESSAGES::CALIB_TOUCH_DONE;
+      send[1] = (byte)retVal;
+      send[2] = (byte)((thresh->min >> 8) & 0xff);
+      send[3] = (byte)(thresh->min & 0xff);
+      send[4] = (byte)((thresh->max >> 8) & 0xff);
+      send[5] = (byte)(thresh->max & 0xff);
+      send[6] = (byte)((thresh->avg >> 8) & 0xff);
+      send[7] = (byte)(thresh->avg & 0xff);
+      RawHID.send(send, 64);
       break;
     }
 

@@ -8,9 +8,11 @@
 enum class HID_MESSAGES : uint8_t {
   COMMAND      = 0xC0,
   CALIB_RANGES = 0xD0,
-  CALIB_TOUCH  = 0xD1,
-  MEASURE      = 0xE0,
-  END          = 0xFF
+  CALIB_RANGES_DONE,
+  CALIB_TOUCH = 0xE0,
+  CALIB_TOUCH_DONE,
+  MEASURE = 0xF0,
+  END     = 0xFF
 };
 
 enum class MACHINE_STATE : uint8_t {
