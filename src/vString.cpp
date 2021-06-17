@@ -1,6 +1,11 @@
 #include "vString.h"
 #include "main.h"
 
+/******************************************************************************
+ * vString::vString
+ * ----------------------------------------------------------------------------
+ * Class object constructor
+ ******************************************************************************/
 vString::vString(uint8_t tPin, uint8_t aPin, char strName, uint8_t strNumber)
 {
   name         = strName;
@@ -20,10 +25,19 @@ vString::vString(uint8_t tPin, uint8_t aPin, char strName, uint8_t strNumber)
   pinMode(touchPin, INPUT);
 }
 
+/******************************************************************************
+ * vString::~vString
+ * ----------------------------------------------------------------------------
+ * Class object destructor
+ ******************************************************************************/
 vString::~vString()
 {
 }
 
+/******************************************************************************
+ * vString::getCalibValues
+ * ----------------------------------------------------------------------------
+ ******************************************************************************/
 void vString::getCalibValues()
 {
   getFromEeprom(CALIB_TYPE::CALIB_RANGE);
@@ -32,9 +46,13 @@ void vString::getCalibValues()
   getFromEeprom(CALIB_TYPE::CALIB_TOUCH);
   if ((touchThresh.avg > TOUCH_THRESH_MIN) && (touchThresh.avg < TOUCH_THRESH_MAX)) touchCalDone = true;
 
-  viewCalibValues();
+  // viewCalibValues();
 }
 
+/******************************************************************************
+ * vString::checkCalStatus
+ * ----------------------------------------------------------------------------
+ ******************************************************************************/
 bool vString::checkCalStatus(CALIB_TYPE type)
 {
   bool retVal = false;
@@ -69,6 +87,10 @@ bool vString::checkCalStatus(CALIB_TYPE type)
   return retVal;
 }
 
+/******************************************************************************
+ * vString::saveToEeprom
+ * ----------------------------------------------------------------------------
+ ******************************************************************************/
 void vString::saveToEeprom(CALIB_TYPE type, uint8_t* data)
 {
   switch (type)
@@ -103,6 +125,10 @@ void vString::saveToEeprom(CALIB_TYPE type, uint8_t* data)
   }
 }
 
+/******************************************************************************
+ * vString::getFromEeprom
+ * ----------------------------------------------------------------------------
+ ******************************************************************************/
 void vString::getFromEeprom(CALIB_TYPE type)
 {
   switch (type)
@@ -288,46 +314,63 @@ bool vString::calibrate(CALIB_TYPE type, ADC_Module* module, range_t* range, thr
   return retVal;
 }
 
+/*****************************************************************************
+ * vString::measure
+ * ---------------------------------------------------------------------------
+ * Perform & return the ADC measurement value if the string is touched,
+ * otherwise return 0.
+ *
+ * Parameters:
+ * - *module    -> ADC module to work with
+ * - smoothing  -> smoothing value (not used yet)
+ * 
+ * Return:
+ * uint16_t     -> measured ADC value (8 - 16 bit)
+ *****************************************************************************/
 uint16_t vString::measure(ADC_Module* module, uint8_t smoothing)
 {
-  if (touchRead(touchPin) > touchThresh.avg)
+  if (touchRead(touchPin) > (int)(1.1 * (float)touchThresh.min))
     return module->analogRead(adcPin);
   else
     return 0;
 }
 
-void vString::displayRange(range_t* range)
-{
-  static uint32_t start = 0;
-  uint32_t now          = millis();
-  if ((now - start) > 100)
-  {
-    Serial.printf("Range: %d - %d\n", range->min, range->max);
-    start = now;
-  }
-}
+// void vString::displayRange(range_t* range)
+// {
+//   static uint32_t start = 0;
+//   uint32_t now          = millis();
+//   if ((now - start) > 100)
+//   {
+//     Serial.printf("Range: %d - %d\n", range->min, range->max);
+//     start = now;
+//   }
+// }
 
-void vString::displayTouch(thresh_t* thresh)
-{
-  static uint32_t start = 0;
-  uint32_t now          = millis();
-  if ((now - start) > 100)
-  {
-    Serial.printf("Thresholds: %d - %d\n", thresh->min, thresh->max);
-    start = now;
-  }
-}
+// void vString::displayTouch(thresh_t* thresh)
+// {
+//   static uint32_t start = 0;
+//   uint32_t now          = millis();
+//   if ((now - start) > 100)
+//   {
+//     Serial.printf("Thresholds: %d - %d\n", thresh->min, thresh->max);
+//     start = now;
+//   }
+// }
 
-void vString::viewCalibValues()
-{
-  Serial.printf("String name: %c, ADC range: %d - %d, touch thresholds: %d - %d (%d)\n", name, adcRange.min, adcRange.max, touchThresh.min, touchThresh.max, touchThresh.avg);
-}
+// void vString::viewCalibValues()
+// {
+//   Serial.printf("String name: %c, ADC range: %d - %d, touch thresholds: %d - %d (%d)\n", name, adcRange.min, adcRange.max, touchThresh.min, touchThresh.max, touchThresh.avg);
+// }
 
-void vString::viewStringValues()
-{
-  Serial.printf("String name: %c, number: %d, ADC pin: %d, touch pin: %d\n", name, number, adcPin, touchPin);
-}
+// void vString::viewStringValues()
+// {
+//   Serial.printf("String name: %c, number: %d, ADC pin: %d, touch pin: %d\n", name, number, adcPin, touchPin);
+// }
 
+/******************************************************************************
+ * vString::resetCalibValues
+ * ----------------------------------------------------------------------------
+ ******************************************************************************/
 void vString::resetCalibValues(CALIB_TYPE type)
 {
   switch (type)

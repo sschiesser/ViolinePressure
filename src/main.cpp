@@ -5,13 +5,15 @@
 #include <Arduino.h>
 #include <EEPROM.h>
 
-elapsedMillis gDetla, eDelta;
+// elapsedMillis gDetla, eDelta;
+elapsedMillis deltaMs;
+elapsedMicros deltaUs;
 ADC* adc      = new ADC(); // adc object;
 vString* Gstr = new vString(0, A0, 'G', 0);
 // vString* Dstr = new vString(6, A2, 'D', 1);
 // vString* Astr = new vString(4, A3, 'A', 2);
 vString* Estr = new vString(1, A1, 'E', 1);
-uint8_t buffer[64];
+// uint8_t buffer[64];
 uint32_t start;
 
 MACHINE_STATE machineState = MACHINE_STATE::IDLE;
@@ -21,37 +23,20 @@ void setup()
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
 
-  Serial.begin(115200);
-  delay(1000);
+  // Serial.begin(115200);
+  // delay(1000);
 
-  adc->adc0->setAveraging(8);                                          // set number of averages
+  adc->adc0->setAveraging(32);                                         // set number of averages
   adc->adc0->setResolution(10);                                        // set bits of resolution
   adc->adc0->setConversionSpeed(ADC_CONVERSION_SPEED::VERY_LOW_SPEED); // change the conversion speed
   adc->adc0->setSamplingSpeed(ADC_SAMPLING_SPEED::VERY_LOW_SPEED);     // change the sampling speed
-
-  Gstr->viewStringValues();
-  Gstr->getCalibValues();
-  Serial.println("");
-  Estr->viewStringValues();
-  Estr->getCalibValues();
-  Serial.println("");
-
-  displayHelp();
 }
 
-/* Packets sent from host to Teensy (requests)
-    - request len req1 req2 req3 ... end
-*/
-/* Packets sent from Teensy to host (notifications)
-    - acknowledgement len ack1 ack2 ack3 ... m_state end
-      OR
-    - measurement len meas1 meas2 meas3 ... end measurement values should follow the scheme:
-      '0x00 len TtimeH TtimeL StimeH StimeL Str1H Str1L Str2H Str2L Str3H Str3L Str4H Str4L 0xff'
-*/
 void loop()
 {
-
   HID_REQUESTS req[64];
+  uint8_t notif[64];
+  uint16_t eVal, gVal;
   uint8_t n = RawHID.recv(req, 0);
   if (n > 0)
   {
@@ -96,10 +81,27 @@ void loop()
         Gstr->saveToEeprom(CALIB_TYPE::CALIB_RANGE, (uint8_t*)&Gstr->adcRange);
       break;
 
-    case MACHINE_STATE::MEASURING:
-      Gstr->measure(adc->adc0, 10);
-      Estr->measure(adc->adc0, 10);
+    case MACHINE_STATE::MEASURING: {
+      gVal     = Gstr->measure(adc->adc0, 10);
+      eVal     = Estr->measure(adc->adc0, 10);
+      notif[0] = (uint8_t)HID_NOTIFICATIONS::MEASUREMENT;
+      notif[1] = 8;
+      notif[2] = ((deltaMs >> 8) & 0xff);
+      notif[3] = (deltaMs & 0xff);
+      // notif[2] = ((deltaUs >> 8) & 0xff);
+      // notif[3] = (deltaUs & 0xff);
+      notif[4] = ((gVal >> 8) & 0xff);
+      notif[5] = (gVal & 0xff);
+      notif[6] = ((eVal >> 8) & 0xff);
+      notif[7] = (eVal & 0xff);
+      notif[8] = (uint8_t)machineState;
+      notif[9] = (uint8_t)HID_NOTIFICATIONS::END;
+      RawHID.send(notif, 2);
+      deltaUs = 0;
+      deltaMs = 0;
+      // delay(2);
       break;
+    }
 
     default:
       break;
@@ -145,15 +147,18 @@ MACHINE_STATE parseRequests(HID_REQUESTS* req)
 
     switch ((HID_REQUESTS)req[2])
     {
-      case HID_REQUESTS::MEASURE:
-        notif[1]            = 3;
-        notif[2]            = (uint8_t)HID_NOTIFICATIONS::MEASURE_REQ;
-        notif[3]            = (uint8_t)machineState;
-        notif[notif[1] + 1] = (uint8_t)HID_NOTIFICATIONS::END;
-        retVal              = MACHINE_STATE::MEASURING;
+      case HID_REQUESTS::MEASURE: {
+        notif[1] = 3;
+        notif[2] = (uint8_t)HID_NOTIFICATIONS::MEASURE_REQ;
+        notif[3] = (uint8_t)machineState;
+        notif[4] = (uint8_t)HID_NOTIFICATIONS::END;
+        retVal   = MACHINE_STATE::MEASURING;
+        deltaUs  = 0;
+        deltaMs  = 0;
         break;
+      }
 
-      case HID_REQUESTS::CALIB_RANGES:
+      case HID_REQUESTS::CALIB_RANGES: {
         notif[1]            = 4;
         notif[2]            = (uint8_t)HID_NOTIFICATIONS::CALIB_RANGES;
         notif[4]            = (uint8_t)machineState;
@@ -176,8 +181,9 @@ MACHINE_STATE parseRequests(HID_REQUESTS* req)
           notif[4] = (uint8_t)HID_NOTIFICATIONS::END;
         }
         break;
+      }
 
-      case HID_REQUESTS::CALIB_TOUCH:
+      case HID_REQUESTS::CALIB_TOUCH: {
         notif[1] = 4;
         notif[2] = (uint8_t)HID_NOTIFICATIONS::CALIB_TOUCH;
         notif[4] = (uint8_t)machineState;
@@ -200,24 +206,28 @@ MACHINE_STATE parseRequests(HID_REQUESTS* req)
           notif[4] = (uint8_t)HID_NOTIFICATIONS::END;
         }
         break;
+      }
 
-      case HID_REQUESTS::VIEW:
+      case HID_REQUESTS::VIEW: {
         break;
+      }
 
-      case HID_REQUESTS::EXIT:
-        notif[1]     = 3;
-        notif[2]     = (uint8_t)HID_NOTIFICATIONS::EXIT_REQ;
-        notif[3]     = (uint8_t)machineState;
-        notif[4]     = (uint8_t)HID_NOTIFICATIONS::END;
-        machineState = MACHINE_STATE::IDLE;
+      case HID_REQUESTS::EXIT: {
+        notif[1] = 3;
+        notif[2] = (uint8_t)HID_NOTIFICATIONS::EXIT_REQ;
+        notif[3] = (uint8_t)machineState;
+        notif[4] = (uint8_t)HID_NOTIFICATIONS::END;
+        retVal   = MACHINE_STATE::IDLE;
         break;
+      }
 
-      default:
+      default: {
         notif[1] = 3;
         notif[2] = (uint8_t)HID_NOTIFICATIONS::ERROR_BADCMD;
         notif[3] = (uint8_t)machineState;
         notif[4] = (uint8_t)HID_NOTIFICATIONS::END;
         break;
+      }
     }
 
     RawHID.send(notif, 50);
