@@ -7,7 +7,7 @@
 
 enum class HID_REQUESTS : uint8_t {
   // request type headers (< 0x20)
-  COMMAND = 0x10,
+  REQUEST = 0x10,
   // requests values (0x20 <= val <= 0x7E)
   STRING_A     = 'a',
   STRING_D     = 'd',
@@ -35,10 +35,11 @@ enum class HID_NOTIFICATIONS : uint8_t {
   CALIB_TOUCH_DONE  = 0x31,
   MEASURE_REQ       = 0x40,
   VIEW_VALUES       = 0x50,
-  STRING_E          = 0x60,
-  STRING_G          = 0x61,
-  STRING_D          = 0x62,
-  STRING_A          = 0x63,
+  EXIT_REQ          = 0x60,
+  STRING_E          = 0xC0,
+  STRING_G          = 0xC1,
+  STRING_D          = 0xC2,
+  STRING_A          = 0xC3,
   ERROR_BADCMD      = 0xE0,
   ERROR_TIMEOUT     = 0xE1,
   // notification end delimiter

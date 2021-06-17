@@ -97,6 +97,8 @@ void loop()
       break;
 
     case MACHINE_STATE::MEASURING:
+      Gstr->measure(adc->adc0, 10);
+      Estr->measure(adc->adc0, 10);
       break;
 
     default:
@@ -104,9 +106,22 @@ void loop()
   }
 }
 
-/* 
-  When a request is received, always send an acknowledgement of it, followed by either requested values (same packet) or measurement values (different packets continuous)
-*/
+/* ****************************************************************************
+ * MACHINE_STATE parseRequests
+ * ----------------------------------------------------------------------------
+ * 1. verify if the received request matches the expectet format:
+ *    - 1st byte = HID_REQUESTS::REQUEST
+ *    - 2nd byte (len) > 0 (at least len byte)
+ *    - len+1 byte = HID_REQUESTS::END
+ * 2. on format match, parse the main command byte (req[2]) and send
+ *    acknowledgement notification with corresponding answer
+ * 
+ * Parameters:
+ * - *req           -> received request message
+ * 
+ * Return:
+ * - MACHINE_STATE  -> current machine state induced by the request
+ * ****************************************************************************/
 MACHINE_STATE parseRequests(HID_REQUESTS* req)
 {
   bool msgFormat = false;
@@ -115,7 +130,7 @@ MACHINE_STATE parseRequests(HID_REQUESTS* req)
 
   len = (uint8_t)req[1];
   pos = (uint8_t)req[1] + 1;
-  if ((req[0] == HID_REQUESTS::COMMAND) &&
+  if ((req[0] == HID_REQUESTS::REQUEST) &&
       (req[pos] == HID_REQUESTS::END) &&
       (len > 0))
   {
@@ -125,7 +140,6 @@ MACHINE_STATE parseRequests(HID_REQUESTS* req)
   /* Request format is matching the expectations: we can parse the message */
   if (msgFormat)
   {
-    uint8_t notifLen  = 0;
     uint8_t notif[64] = {0};
     notif[0]          = (uint8_t)HID_NOTIFICATIONS::ACKNOWLEDGEMENT;
 
@@ -191,6 +205,11 @@ MACHINE_STATE parseRequests(HID_REQUESTS* req)
         break;
 
       case HID_REQUESTS::EXIT:
+        notif[1]     = 3;
+        notif[2]     = (uint8_t)HID_NOTIFICATIONS::EXIT_REQ;
+        notif[3]     = (uint8_t)machineState;
+        notif[4]     = (uint8_t)HID_NOTIFICATIONS::END;
+        machineState = MACHINE_STATE::IDLE;
         break;
 
       default:

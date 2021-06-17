@@ -138,6 +138,21 @@ void vString::getFromEeprom(CALIB_TYPE type)
   }
 }
 
+/******************************************************************************
+ * vString::calibrate
+ * ----------------------------------------------------------------------------
+ * Perform a *blocking* calibration loop on given parameters.
+ * 
+ * Parameters:
+ * - type     ->  calibration type: CALIB_RANGE (min/max of ADC conversion) and
+ *                CALIB_TOUCH (min/max/avg of string capacitive touch threshold)
+ * - *module  ->  ADC module to work with
+ * - *range   ->  min/max struct to save CALIB_RANGE values
+ * - *thresh  ->  min/max/avg struct to save CALIB_TOUCH values
+ * 
+ * Return:
+ * - bool     ->  calibration values are in an acceptable range
+ ******************************************************************************/
 bool vString::calibrate(CALIB_TYPE type, ADC_Module* module, range_t* range, thresh_t* thresh)
 {
   bool doCal          = true;
@@ -148,6 +163,13 @@ bool vString::calibrate(CALIB_TYPE type, ADC_Module* module, range_t* range, thr
 
   switch (type)
   {
+    /* CALIB_TYPE::CALIB_RANGE
+     * -  Read ADC values as long as the string is touched (i.e. above the
+     *    previously calibrated threshold), determine min/max values and
+     *    send notification.
+     * -  If the string has not been touched for 2 seconds, stop reading,
+     *    check calibration values and send final notification.
+     */
     case CALIB_TYPE::CALIB_RANGE: {
       range->min = UINT16_MAX;
       range->max = 0;
@@ -158,6 +180,7 @@ bool vString::calibrate(CALIB_TYPE type, ADC_Module* module, range_t* range, thr
           uint16_t val = module->analogRead(adcPin);
           if (val > range->max) range->max = val;
           if (val < range->min) range->min = val;
+
           send[0] = (uint8_t)HID_NOTIFICATIONS::CALIB_RANGES;
           send[1] = 6;
           send[2] = ((range->min >> 8) & 0xff);
@@ -173,7 +196,6 @@ bool vString::calibrate(CALIB_TYPE type, ADC_Module* module, range_t* range, thr
 
         if (delta > 2000)
         {
-          // Serial.println("Timeout!");
           doCal = false;
         }
       } // while(doCal)
@@ -194,6 +216,13 @@ bool vString::calibrate(CALIB_TYPE type, ADC_Module* module, range_t* range, thr
       break;
     }
 
+    /* CALIB_TYPE::CALIB_TOUCH
+     * -  Read & average capacitive value on the given string, determine
+     *    min/max values and send notification.
+     * -  If 'x' (EXIT) is received, stop reading, calculate the average
+     *    threshold, check if it is in an acceptable range and send
+     *    the final calibration values
+     */
     case CALIB_TYPE::CALIB_TOUCH: {
       thresh->min = UINT16_MAX;
       thresh->max = 0;
@@ -224,7 +253,7 @@ bool vString::calibrate(CALIB_TYPE type, ADC_Module* module, range_t* range, thr
         {
           uint8_t len = recv[1];
           uint8_t pos = recv[1] + 1;
-          if ((recv[0] == (uint8_t)HID_REQUESTS::COMMAND) &&
+          if ((recv[0] == (uint8_t)HID_REQUESTS::REQUEST) &&
               (recv[pos] == (uint8_t)HID_REQUESTS::END) &&
               (recv[2] == (uint8_t)HID_REQUESTS::EXIT) &&
               len > 0)
@@ -259,8 +288,12 @@ bool vString::calibrate(CALIB_TYPE type, ADC_Module* module, range_t* range, thr
   return retVal;
 }
 
-void vString::measure(uint8_t smoothing)
+uint16_t vString::measure(ADC_Module* module, uint8_t smoothing)
 {
+  if (touchRead(touchPin) > touchThresh.avg)
+    return module->analogRead(adcPin);
+  else
+    return 0;
 }
 
 void vString::displayRange(range_t* range)

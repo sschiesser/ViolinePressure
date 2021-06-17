@@ -63,7 +63,7 @@ class vString
   void saveToEeprom(CALIB_TYPE type, uint8_t* data);
   void getFromEeprom(CALIB_TYPE type);
   bool calibrate(CALIB_TYPE type, ADC_Module* module, range_t* range, thresh_t* thresh);
-  void measure(uint8_t smoothing);
+  uint16_t measure(ADC_Module* module, uint8_t smoothing);
   void displayRange(range_t* range);
   void displayTouch(thresh_t* thresh);
   void viewCalibValues();
