@@ -158,24 +158,39 @@ bool vString::calibrate(CALIB_TYPE type, ADC_Module* module, range_t* range, thr
           uint16_t val = module->analogRead(adcPin);
           if (val > range->max) range->max = val;
           if (val < range->min) range->min = val;
-          displayRange(range);
+          send[0] = (uint8_t)HID_NOTIFICATIONS::CALIB_RANGES;
+          send[1] = 6;
+          send[2] = ((range->min >> 8) & 0xff);
+          send[3] = (range->min) & 0xff;
+          send[4] = ((range->max >> 8) & 0xff);
+          send[5] = (range->max) & 0xff;
+          send[6] = (uint8_t)MACHINE_STATE::CALIB_RANGES;
+          send[7] = (uint8_t)HID_NOTIFICATIONS::END;
+          RawHID.send(send, 64);
+
           delta = 0;
-        }
+        } // while(touchRead())
 
         if (delta > 2000)
         {
-          Serial.println("Timeout!");
+          // Serial.println("Timeout!");
           doCal = false;
         }
-
-        if (Serial.available())
-        {
-          char c = Serial.read();
-          if (c == 'x') doCal = false;
-        }
-      }
+      } // while(doCal)
 
       retVal = checkCalStatus(CALIB_TYPE::CALIB_RANGE);
+
+      send[0] = (uint8_t)HID_NOTIFICATIONS::CALIB_RANGES_DONE;
+      send[1] = 7;
+      send[2] = ((range->min >> 8) & 0xff);
+      send[3] = (range->min & 0xff);
+      send[4] = ((range->max >> 8) & 0xff);
+      send[5] = (range->max & 0xff);
+      send[6] = retVal;
+      send[7] = (uint8_t)MACHINE_STATE::CALIB_RANGES;
+      send[8] = (uint8_t)HID_NOTIFICATIONS::END;
+      RawHID.send(send, 64);
+
       break;
     }
 
@@ -194,15 +209,13 @@ bool vString::calibrate(CALIB_TYPE type, ADC_Module* module, range_t* range, thr
         if (avg > thresh->max) thresh->max = avg;
         if (avg < thresh->min) thresh->min = avg;
 
-        send[0] = (uint8_t)HID_NOTIFICATIONS::CALIB_TOUCH;
-        // send[1] = (byte)((avg >> 8) & 0xff);
-        // send[2] = (byte)(avg & 0xff);
+        send[0]           = (uint8_t)HID_NOTIFICATIONS::CALIB_TOUCH;
         send[1]           = 6;
         send[2]           = ((thresh->min >> 8) & 0xff);
         send[3]           = (thresh->min & 0xff);
         send[4]           = ((thresh->max >> 8) & 0xff);
         send[5]           = (thresh->max & 0xff);
-        send[6]           = (uint8_t)MACHINE_STATE::CALIB_TOUCH_G;
+        send[6]           = (uint8_t)MACHINE_STATE::CALIB_TOUCH;
         send[send[1] + 1] = (uint8_t)HID_NOTIFICATIONS::END;
         RawHID.send(send, 64);
 

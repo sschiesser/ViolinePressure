@@ -57,6 +57,7 @@ void loop()
   {
     machineState = parseRequests(req);
   }
+
   switch (machineState)
   {
     case MACHINE_STATE::CALIB_TOUCH_E:
@@ -78,9 +79,21 @@ void loop()
       break;
 
     case MACHINE_STATE::CALIB_RANGES_E:
+      Estr->resetCalibValues(CALIB_TYPE::CALIB_RANGE);
+      Estr->saveToEeprom(CALIB_TYPE::CALIB_RANGE, (uint8_t*)&Estr->adcRange);
+      Estr->calibrate(CALIB_TYPE::CALIB_RANGE, adc->adc0, &Estr->adcRange, &Estr->touchThresh);
+      machineState = MACHINE_STATE::IDLE;
+      if (Estr->adcCalDone)
+        Estr->saveToEeprom(CALIB_TYPE::CALIB_RANGE, (uint8_t*)&Estr->adcRange);
       break;
 
     case MACHINE_STATE::CALIB_RANGES_G:
+      Gstr->resetCalibValues(CALIB_TYPE::CALIB_RANGE);
+      Gstr->saveToEeprom(CALIB_TYPE::CALIB_RANGE, (uint8_t*)&Gstr->adcRange);
+      Gstr->calibrate(CALIB_TYPE::CALIB_RANGE, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh);
+      machineState = MACHINE_STATE::IDLE;
+      if (Gstr->adcCalDone)
+        Gstr->saveToEeprom(CALIB_TYPE::CALIB_RANGE, (uint8_t*)&Gstr->adcRange);
       break;
 
     case MACHINE_STATE::MEASURING:
@@ -143,25 +156,35 @@ MACHINE_STATE parseRequests(HID_REQUESTS* req)
         }
         else
         {
-          notif[1]            = 3;
-          notif[2]            = (uint8_t)HID_NOTIFICATIONS::ERROR_BADCMD;
-          notif[3]            = (uint8_t)machineState;
-          notif[notif[1] + 1] = (uint8_t)HID_NOTIFICATIONS::END;
+          notif[1] = 3;
+          notif[2] = (uint8_t)HID_NOTIFICATIONS::ERROR_BADCMD;
+          notif[3] = (uint8_t)machineState;
+          notif[4] = (uint8_t)HID_NOTIFICATIONS::END;
         }
         break;
 
       case HID_REQUESTS::CALIB_TOUCH:
-        notifLen = 3;
-        notif[1] = notifLen;
+        notif[1] = 4;
         notif[2] = (uint8_t)HID_NOTIFICATIONS::CALIB_TOUCH;
-        notif[3] = (uint8_t)machineState;
-        notif[4] = (uint8_t)HID_NOTIFICATIONS::END;
+        notif[4] = (uint8_t)machineState;
+        notif[5] = (uint8_t)HID_NOTIFICATIONS::END;
         if (req[3] == HID_REQUESTS::STRING_G)
-          retVal = MACHINE_STATE::CALIB_TOUCH_G;
+        {
+          notif[3] = (uint8_t)HID_NOTIFICATIONS::STRING_G;
+          retVal   = MACHINE_STATE::CALIB_TOUCH_G;
+        }
         else if (req[3] == HID_REQUESTS::STRING_E)
-          retVal = MACHINE_STATE::CALIB_TOUCH_E;
+        {
+          notif[3] = (uint8_t)HID_NOTIFICATIONS::STRING_E;
+          retVal   = MACHINE_STATE::CALIB_TOUCH_E;
+        }
         else
+        {
+          notif[1] = 3;
           notif[2] = (uint8_t)HID_NOTIFICATIONS::ERROR_BADCMD;
+          notif[3] = (uint8_t)machineState;
+          notif[4] = (uint8_t)HID_NOTIFICATIONS::END;
+        }
         break;
 
       case HID_REQUESTS::VIEW:
