@@ -1,9 +1,11 @@
 #ifndef VSTRING_H
 #define VSTRING_H
 
+// #include "main.h"
 #include <ADC.h>
 #include <Arduino.h>
 #include <EEPROM.h>
+#include <usb_rawhid.h>
 
 #define BUFFER_SIZE UINT8_MAX
 #define EEPROM_RANGE_ADDR 0
@@ -61,7 +63,7 @@ class vString
   void saveToEeprom(CALIB_TYPE type, uint8_t* data);
   void getFromEeprom(CALIB_TYPE type);
   bool calibrate(CALIB_TYPE type, ADC_Module* module, range_t* range, thresh_t* thresh);
-  void measure(uint8_t smoothing);
+  uint16_t measure(ADC_Module* module, uint8_t smoothing);
   void displayRange(range_t* range);
   void displayTouch(thresh_t* thresh);
   void viewCalibValues();
