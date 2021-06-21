@@ -70,7 +70,7 @@ bool vString::checkCalStatus(CALIB_TYPE type)
     }
 
     case CALIB_TYPE::CALIB_TOUCH: {
-      if ((touchThresh.avg >= (1.25 * TOUCH_THRESH_MIN)) && (touchThresh.avg <= (0.8 * TOUCH_THRESH_MAX)))
+      if ((touchThresh.avg >= (1.25 * touchThresh.min)) && (touchThresh.avg <= (0.8 * touchThresh.max)))
         touchCalDone = true;
       else
         touchCalDone = false;
