@@ -9,10 +9,10 @@
 elapsedMillis deltaMs;
 elapsedMicros deltaUs;
 ADC* adc      = new ADC(); // adc object;
-vString* Gstr = new vString(0, A0, 'G', 0);
+vString* Gstr = new vString(0, A0, 'G', (uint8_t)HID_NOTIFICATIONS::STRING_G);
 // vString* Dstr = new vString(6, A2, 'D', 1);
 // vString* Astr = new vString(4, A3, 'A', 2);
-vString* Estr = new vString(1, A1, 'E', 1);
+vString* Estr = new vString(1, A1, 'E', (uint8_t)HID_NOTIFICATIONS::STRING_E);
 // uint8_t buffer[64];
 uint32_t start;
 
