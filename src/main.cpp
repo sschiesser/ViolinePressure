@@ -9,14 +9,14 @@
 elapsedMillis deltaMs;
 elapsedMicros deltaUs;
 ADC* adc      = new ADC(); // adc object;
-vString* Gstr = new vString(0, A0, 'G', (uint8_t)HID_NOTIFICATIONS::STRING_G);
+vString* Gstr = new vString(0, A0, 'G', (uint8_t)HID_NOTIF::N_STR_G);
 // vString* Dstr = new vString(6, A2, 'D', 1);
 // vString* Astr = new vString(4, A3, 'A', 2);
-vString* Estr = new vString(1, A1, 'E', (uint8_t)HID_NOTIFICATIONS::STRING_E);
+vString* Estr = new vString(1, A1, 'E', (uint8_t)HID_NOTIF::N_STR_E);
 // uint8_t buffer[64];
 uint32_t start;
 
-MACHINE_STATE machineState = MACHINE_STATE::IDLE;
+MACHINE_STATE machineState = MACHINE_STATE::S_IDLE;
 
 void setup()
 {
@@ -34,7 +34,7 @@ void setup()
 
 void loop()
 {
-  HID_REQUESTS req[64];
+  HID_REQ req[64];
   uint8_t notif[64];
   uint16_t eVal, gVal;
   uint8_t n = RawHID.recv(req, 0);
@@ -45,46 +45,46 @@ void loop()
 
   switch (machineState)
   {
-    case MACHINE_STATE::CALIB_TOUCH_E:
+    case MACHINE_STATE::S_CT_E:
       Estr->resetCalibValues(CALIB_TYPE::CALIB_TOUCH);
       Estr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Estr->touchThresh);
       Estr->calibrate(CALIB_TYPE::CALIB_TOUCH, adc->adc0, &Estr->adcRange, &Estr->touchThresh);
-      machineState = MACHINE_STATE::IDLE;
+      machineState = MACHINE_STATE::S_IDLE;
       if (Estr->touchCalDone)
         Estr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Estr->touchThresh);
       break;
 
-    case MACHINE_STATE::CALIB_TOUCH_G:
+    case MACHINE_STATE::S_CT_G:
       Gstr->resetCalibValues(CALIB_TYPE::CALIB_TOUCH);
       Gstr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Gstr->touchThresh);
       Gstr->calibrate(CALIB_TYPE::CALIB_TOUCH, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh);
-      machineState = MACHINE_STATE::IDLE;
+      machineState = MACHINE_STATE::S_IDLE;
       if (Gstr->touchCalDone)
         Gstr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Gstr->touchThresh);
       break;
 
-    case MACHINE_STATE::CALIB_RANGES_E:
+    case MACHINE_STATE::S_CR_E:
       Estr->resetCalibValues(CALIB_TYPE::CALIB_RANGE);
       Estr->saveToEeprom(CALIB_TYPE::CALIB_RANGE, (uint8_t*)&Estr->adcRange);
       Estr->calibrate(CALIB_TYPE::CALIB_RANGE, adc->adc0, &Estr->adcRange, &Estr->touchThresh);
-      machineState = MACHINE_STATE::IDLE;
+      machineState = MACHINE_STATE::S_IDLE;
       if (Estr->adcCalDone)
         Estr->saveToEeprom(CALIB_TYPE::CALIB_RANGE, (uint8_t*)&Estr->adcRange);
       break;
 
-    case MACHINE_STATE::CALIB_RANGES_G:
+    case MACHINE_STATE::S_CR_G:
       Gstr->resetCalibValues(CALIB_TYPE::CALIB_RANGE);
       Gstr->saveToEeprom(CALIB_TYPE::CALIB_RANGE, (uint8_t*)&Gstr->adcRange);
       Gstr->calibrate(CALIB_TYPE::CALIB_RANGE, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh);
-      machineState = MACHINE_STATE::IDLE;
+      machineState = MACHINE_STATE::S_IDLE;
       if (Gstr->adcCalDone)
         Gstr->saveToEeprom(CALIB_TYPE::CALIB_RANGE, (uint8_t*)&Gstr->adcRange);
       break;
 
-    case MACHINE_STATE::MEASURING: {
+    case MACHINE_STATE::S_MEAS: {
       gVal     = Gstr->measure(adc->adc0, 10);
       eVal     = Estr->measure(adc->adc0, 10);
-      notif[0] = (uint8_t)HID_NOTIFICATIONS::MEASUREMENT;
+      notif[0] = (uint8_t)HID_NOTIF::N_MEAS;
       notif[1] = 8;
       notif[2] = ((deltaMs >> 8) & 0xff);
       notif[3] = (deltaMs & 0xff);
@@ -95,7 +95,7 @@ void loop()
       notif[6] = ((eVal >> 8) & 0xff);
       notif[7] = (eVal & 0xff);
       notif[8] = (uint8_t)machineState;
-      notif[9] = (uint8_t)HID_NOTIFICATIONS::END;
+      notif[9] = (uint8_t)HID_NOTIF::N_END;
       RawHID.send(notif, 2);
       deltaUs = 0;
       deltaMs = 0;
@@ -112,9 +112,9 @@ void loop()
  * MACHINE_STATE parseRequests
  * ----------------------------------------------------------------------------
  * 1. verify if the received request matches the expectet format:
- *    - 1st byte = HID_REQUESTS::REQUEST
+ *    - 1st byte = HID_REQUESTS::R_CMD
  *    - 2nd byte (len) > 0 (at least len byte)
- *    - len+1 byte = HID_REQUESTS::END
+ *    - len+1 byte = HID_REQUESTS::R_END
  * 2. on format match, parse the main command byte (req[2]) and send
  *    acknowledgement notification with corresponding answer
  * 
@@ -124,16 +124,16 @@ void loop()
  * Return:
  * - MACHINE_STATE  -> current machine state induced by the request
  * ****************************************************************************/
-MACHINE_STATE parseRequests(HID_REQUESTS* req)
+MACHINE_STATE parseRequests(HID_REQ* req)
 {
   bool msgFormat = false;
   uint8_t len, pos;
-  MACHINE_STATE retVal = MACHINE_STATE::ERROR; //machineState;
+  MACHINE_STATE retVal = MACHINE_STATE::S_ERR; //machineState;
 
   len = (uint8_t)req[1];
   pos = (uint8_t)req[1] + 1;
-  if ((req[0] == HID_REQUESTS::REQUEST) &&
-      (req[pos] == HID_REQUESTS::END) &&
+  if ((req[0] == HID_REQ::R_CMD) &&
+      (req[pos] == HID_REQ::R_END) &&
       (len > 0))
   {
     msgFormat = true;
@@ -143,89 +143,89 @@ MACHINE_STATE parseRequests(HID_REQUESTS* req)
   if (msgFormat)
   {
     uint8_t notif[64] = {0};
-    notif[0]          = (uint8_t)HID_NOTIFICATIONS::ACKNOWLEDGEMENT;
+    notif[0]          = (uint8_t)HID_NOTIF::N_ACK;
 
-    switch ((HID_REQUESTS)req[2])
+    switch ((HID_REQ)req[2])
     {
-      case HID_REQUESTS::MEASURE: {
+      case HID_REQ::R_MEAS: {
         notif[1] = 3;
-        notif[2] = (uint8_t)HID_NOTIFICATIONS::MEASURE_REQ;
+        notif[2] = (uint8_t)HID_NOTIF::N_MEAS;
         notif[3] = (uint8_t)machineState;
-        notif[4] = (uint8_t)HID_NOTIFICATIONS::END;
-        retVal   = MACHINE_STATE::MEASURING;
+        notif[4] = (uint8_t)HID_NOTIF::N_END;
+        retVal   = MACHINE_STATE::S_MEAS;
         deltaUs  = 0;
         deltaMs  = 0;
         break;
       }
 
-      case HID_REQUESTS::CALIB_RANGES: {
+      case HID_REQ::R_CALIB_R: {
         notif[1]            = 4;
-        notif[2]            = (uint8_t)HID_NOTIFICATIONS::CALIB_RANGES;
+        notif[2]            = (uint8_t)HID_NOTIF::N_CALIB_R;
         notif[4]            = (uint8_t)machineState;
-        notif[notif[1] + 1] = (uint8_t)HID_NOTIFICATIONS::END;
-        if (req[3] == HID_REQUESTS::STRING_G)
+        notif[notif[1] + 1] = (uint8_t)HID_NOTIF::N_END;
+        if (req[3] == HID_REQ::R_STR_G)
         {
-          notif[3] = (uint8_t)HID_NOTIFICATIONS::STRING_G;
-          retVal   = MACHINE_STATE::CALIB_RANGES_G;
+          notif[3] = (uint8_t)HID_NOTIF::N_STR_G;
+          retVal   = MACHINE_STATE::S_CR_G;
         }
-        else if (req[3] == HID_REQUESTS::STRING_E)
+        else if (req[3] == HID_REQ::R_STR_E)
         {
-          notif[3] = (uint8_t)HID_NOTIFICATIONS::STRING_E;
-          retVal   = MACHINE_STATE::CALIB_RANGES_E;
+          notif[3] = (uint8_t)HID_NOTIF::N_STR_E;
+          retVal   = MACHINE_STATE::S_CR_E;
         }
         else
         {
           notif[1] = 3;
-          notif[2] = (uint8_t)HID_NOTIFICATIONS::ERROR_BADCMD;
+          notif[2] = (uint8_t)HID_NOTIF::N_ERR;
           notif[3] = (uint8_t)machineState;
-          notif[4] = (uint8_t)HID_NOTIFICATIONS::END;
+          notif[4] = (uint8_t)HID_NOTIF::N_END;
         }
         break;
       }
 
-      case HID_REQUESTS::CALIB_TOUCH: {
+      case HID_REQ::R_CALIB_T: {
         notif[1] = 4;
-        notif[2] = (uint8_t)HID_NOTIFICATIONS::CALIB_TOUCH;
+        notif[2] = (uint8_t)HID_NOTIF::N_CALIB_T;
         notif[4] = (uint8_t)machineState;
-        notif[5] = (uint8_t)HID_NOTIFICATIONS::END;
-        if (req[3] == HID_REQUESTS::STRING_G)
+        notif[5] = (uint8_t)HID_NOTIF::N_END;
+        if (req[3] == HID_REQ::R_STR_G)
         {
-          notif[3] = (uint8_t)HID_NOTIFICATIONS::STRING_G;
-          retVal   = MACHINE_STATE::CALIB_TOUCH_G;
+          notif[3] = (uint8_t)HID_NOTIF::N_STR_G;
+          retVal   = MACHINE_STATE::S_CT_G;
         }
-        else if (req[3] == HID_REQUESTS::STRING_E)
+        else if (req[3] == HID_REQ::R_STR_E)
         {
-          notif[3] = (uint8_t)HID_NOTIFICATIONS::STRING_E;
-          retVal   = MACHINE_STATE::CALIB_TOUCH_E;
+          notif[3] = (uint8_t)HID_NOTIF::N_STR_E;
+          retVal   = MACHINE_STATE::S_CT_E;
         }
         else
         {
           notif[1] = 3;
-          notif[2] = (uint8_t)HID_NOTIFICATIONS::ERROR_BADCMD;
+          notif[2] = (uint8_t)HID_NOTIF::N_ERR;
           notif[3] = (uint8_t)machineState;
-          notif[4] = (uint8_t)HID_NOTIFICATIONS::END;
+          notif[4] = (uint8_t)HID_NOTIF::N_END;
         }
         break;
       }
 
-      case HID_REQUESTS::VIEW: {
+      case HID_REQ::R_VIEW: {
         break;
       }
 
-      case HID_REQUESTS::EXIT: {
+      case HID_REQ::R_EXIT: {
         notif[1] = 3;
-        notif[2] = (uint8_t)HID_NOTIFICATIONS::EXIT_REQ;
+        notif[2] = (uint8_t)HID_NOTIF::N_EXIT;
         notif[3] = (uint8_t)machineState;
-        notif[4] = (uint8_t)HID_NOTIFICATIONS::END;
-        retVal   = MACHINE_STATE::IDLE;
+        notif[4] = (uint8_t)HID_NOTIF::N_END;
+        retVal   = MACHINE_STATE::S_IDLE;
         break;
       }
 
       default: {
         notif[1] = 3;
-        notif[2] = (uint8_t)HID_NOTIFICATIONS::ERROR_BADCMD;
+        notif[2] = (uint8_t)HID_NOTIF::N_ERR;
         notif[3] = (uint8_t)machineState;
-        notif[4] = (uint8_t)HID_NOTIFICATIONS::END;
+        notif[4] = (uint8_t)HID_NOTIF::N_END;
         break;
       }
     }
@@ -236,36 +236,36 @@ MACHINE_STATE parseRequests(HID_REQUESTS* req)
   return retVal;
 }
 
-//   case HID_REQUESTS::STRING_E:
-//   case HID_REQUESTS::STRING_G:
-//     if (machineState == MACHINE_STATE::CALIB_RANGES)
+//   case HID_REQUESTS::N_STR_E:
+//   case HID_REQUESTS::N_STR_G:
+//     if (machineState == MACHINE_STATE::R_CALIB_R)
 //     {
 //       send[1] = (byte)cmd;
 //       send[2] = (byte)machineState;
 //       RawHID.send(send, 64);
-//       if (cmd == HID_REQUESTS::STRING_E)
+//       if (cmd == HID_REQUESTS::N_STR_E)
 //         Estr->calibrate(CALIB_TYPE::CALIB_RANGE, adc->adc0, &Estr->adcRange, &Estr->touchThresh);
 //       else
 //         Gstr->calibrate(CALIB_TYPE::CALIB_RANGE, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh);
 //     }
-//     else if (machineState == MACHINE_STATE::CALIB_TOUCH)
+//     else if (machineState == MACHINE_STATE::R_CALIB_T)
 //     {
 //       send[1] = (byte)cmd;
 //       send[2] = (byte)machineState;
 //       RawHID.send(send, 64);
-//       if (cmd == HID_REQUESTS::STRING_E)
+//       if (cmd == HID_REQUESTS::N_STR_E)
 //       {
-//         Estr->resetCalibValues(CALIB_TYPE::CALIB_TOUCH);
-//         Estr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Estr->touchThresh);
-//         Estr->calibrate(CALIB_TYPE::CALIB_TOUCH, adc->adc0, &Estr->adcRange, &Estr->touchThresh);
-//         if (Estr->touchCalDone) Estr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Estr->touchThresh);
+//         Estr->resetCalibValues(CALIB_TYPE::R_CALIB_T);
+//         Estr->saveToEeprom(CALIB_TYPE::R_CALIB_T, (uint8_t*)&Estr->touchThresh);
+//         Estr->calibrate(CALIB_TYPE::R_CALIB_T, adc->adc0, &Estr->adcRange, &Estr->touchThresh);
+//         if (Estr->touchCalDone) Estr->saveToEeprom(CALIB_TYPE::R_CALIB_T, (uint8_t*)&Estr->touchThresh);
 //       }
 //       else
 //       {
-//         Gstr->resetCalibValues(CALIB_TYPE::CALIB_TOUCH);
-//         Gstr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Gstr->touchThresh);
-//         Gstr->calibrate(CALIB_TYPE::CALIB_TOUCH, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh);
-//         if (Gstr->touchCalDone) Gstr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Gstr->touchThresh);
+//         Gstr->resetCalibValues(CALIB_TYPE::R_CALIB_T);
+//         Gstr->saveToEeprom(CALIB_TYPE::R_CALIB_T, (uint8_t*)&Gstr->touchThresh);
+//         Gstr->calibrate(CALIB_TYPE::R_CALIB_T, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh);
+//         if (Gstr->touchCalDone) Gstr->saveToEeprom(CALIB_TYPE::R_CALIB_T, (uint8_t*)&Gstr->touchThresh);
 //       }
 //     }
 //     else
@@ -276,20 +276,20 @@ MACHINE_STATE parseRequests(HID_REQUESTS* req)
 //     }
 //     break;
 
-//   case HID_REQUESTS::CALIB_RANGES:
-//   case HID_REQUESTS::CALIB_TOUCH:
-//     if (machineState == MACHINE_STATE::IDLE)
+//   case HID_REQUESTS::R_CALIB_R:
+//   case HID_REQUESTS::R_CALIB_T:
+//     if (machineState == MACHINE_STATE::S_IDLE)
 //     {
 //       send[1] = (byte)cmd;
-//       if (cmd == HID_REQUESTS::CALIB_RANGES)
+//       if (cmd == HID_REQUESTS::R_CALIB_R)
 //       {
-//         machineState = MACHINE_STATE::CALIB_RANGES;
+//         machineState = MACHINE_STATE::R_CALIB_R;
 //         send[2]      = (byte)machineState;
 //         RawHID.send(send, 64);
 //       }
-//       if (cmd == HID_REQUESTS::CALIB_TOUCH)
+//       if (cmd == HID_REQUESTS::R_CALIB_T)
 //       {
-//         machineState = MACHINE_STATE::CALIB_TOUCH;
+//         machineState = MACHINE_STATE::R_CALIB_T;
 //         send[2]      = (byte)machineState;
 //         RawHID.send(send, 64);
 //         // calibrateTouch();
@@ -298,18 +298,18 @@ MACHINE_STATE parseRequests(HID_REQUESTS* req)
 //     else
 //     {
 //       send[1]      = (byte)HID_REQUESTS::ERR_NOCMD;
-//       machineState = MACHINE_STATE::IDLE;
+//       machineState = MACHINE_STATE::S_IDLE;
 //       send[2]      = (byte)machineState;
 //       RawHID.send(send, 64);
 //     }
 
 //     break;
 
-//   case HID_REQUESTS::MEASURE:
-//     if (machineState == MACHINE_STATE::IDLE)
+//   case HID_REQUESTS::R_MEAS:
+//     if (machineState == MACHINE_STATE::S_IDLE)
 //     {
 //       send[1]      = (byte)cmd;
-//       machineState = MACHINE_STATE::MEASURING;
+//       machineState = MACHINE_STATE::S_MEAS;
 //       send[2]      = (byte)machineState;
 //       RawHID.send(send, 64);
 //     }
@@ -321,8 +321,8 @@ MACHINE_STATE parseRequests(HID_REQUESTS* req)
 //     }
 //     break;
 
-//   case HID_REQUESTS::HELP:
-//     if ((machineState == MACHINE_STATE::IDLE) || (machineState == MACHINE_STATE::CALIB_RANGES) || (machineState == MACHINE_STATE::CALIB_TOUCH))
+//   case HID_REQUESTS::R_HELP:
+//     if ((machineState == MACHINE_STATE::S_IDLE) || (machineState == MACHINE_STATE::R_CALIB_R) || (machineState == MACHINE_STATE::R_CALIB_T))
 //     {
 //       send[1] = (byte)cmd;
 //       send[2] = (byte)machineState;
@@ -335,8 +335,8 @@ MACHINE_STATE parseRequests(HID_REQUESTS* req)
 //       RawHID.send(send, 64);
 //     }
 
-//   case HID_REQUESTS::VIEW:
-//     if ((machineState == MACHINE_STATE::IDLE) || (machineState == MACHINE_STATE::CALIB_RANGES) || (machineState == MACHINE_STATE::CALIB_TOUCH))
+//   case HID_REQUESTS::R_VIEW:
+//     if ((machineState == MACHINE_STATE::S_IDLE) || (machineState == MACHINE_STATE::R_CALIB_R) || (machineState == MACHINE_STATE::R_CALIB_T))
 //     {
 //       send[1]  = (byte)cmd;
 //       send[2]  = (byte)((Gstr->adcRange.min >> 8) & 0xff);
@@ -362,9 +362,9 @@ MACHINE_STATE parseRequests(HID_REQUESTS* req)
 //     }
 //     break;
 
-//   case HID_REQUESTS::EXIT:
+//   case HID_REQUESTS::R_EXIT:
 //     send[1]      = (byte)cmd;
-//     machineState = MACHINE_STATE::IDLE;
+//     machineState = MACHINE_STATE::S_IDLE;
 //     send[2]      = (byte)machineState;
 //     RawHID.send(send, 64);
 //     break;
@@ -405,9 +405,9 @@ MACHINE_STATE parseRequests(HID_REQUESTS* req)
 
 // Serial.println("Calibrate touch thresholds.");
 // displayHelp();
-// while (machineState == MACHINE_STATE::CALIB_TOUCH)
+// while (machineState == MACHINE_STATE::R_CALIB_T)
 // {
-//   str->calibrate(CALIB_TYPE::CALIB_TOUCH, adc->adc0, &str->adcRange, &str->touchThresh);
+//   str->calibrate(CALIB_TYPE::R_CALIB_T, adc->adc0, &str->adcRange, &str->touchThresh);
 //   while (!Serial.available())
 //     ;
 
@@ -423,30 +423,30 @@ MACHINE_STATE parseRequests(HID_REQUESTS* req)
 //   else if (c == 'e')
 //   {
 //     Serial.printf("Calibrating E string...\nTouch the string at different places on different manners ('x' to finish (t: %d, a:%d))\n", Estr->touchPin, Estr->adcPin);
-//     Estr->resetCalibValues(CALIB_TYPE::CALIB_TOUCH);
-//     Estr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Estr->touchThresh);
-//     if (Estr->calibrate(CALIB_TYPE::CALIB_TOUCH, adc->adc0, &Estr->adcRange, &Estr->touchThresh))
+//     Estr->resetCalibValues(CALIB_TYPE::R_CALIB_T);
+//     Estr->saveToEeprom(CALIB_TYPE::R_CALIB_T, (uint8_t*)&Estr->touchThresh);
+//     if (Estr->calibrate(CALIB_TYPE::R_CALIB_T, adc->adc0, &Estr->adcRange, &Estr->touchThresh))
 //       Serial.print("Calibration OK! ");
 //     else
 //       Serial.print("Calibration poor! ");
 
 //     Serial.printf("Thresholds on E string: 0x%04x - 0x%04x (avg: 0x%04x)\n", Estr->touchThresh.min, Estr->touchThresh.max, Estr->touchThresh.avg);
-//     if (Estr->touchCalDone) Estr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Estr->touchThresh);
+//     if (Estr->touchCalDone) Estr->saveToEeprom(CALIB_TYPE::R_CALIB_T, (uint8_t*)&Estr->touchThresh);
 
 //     displayHelp();
 //   }
 //   else if (c == 'g')
 //   {
 //     Serial.printf("Calibrating G string...\nTouch the string at different places on different manners ('x' to finish (t: %d, a:%d))\n", Gstr->touchPin, Gstr->adcPin);
-//     Gstr->resetCalibValues(CALIB_TYPE::CALIB_TOUCH);
-//     Gstr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Gstr->touchThresh);
-//     if (Gstr->calibrate(CALIB_TYPE::CALIB_TOUCH, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh))
+//     Gstr->resetCalibValues(CALIB_TYPE::R_CALIB_T);
+//     Gstr->saveToEeprom(CALIB_TYPE::R_CALIB_T, (uint8_t*)&Gstr->touchThresh);
+//     if (Gstr->calibrate(CALIB_TYPE::R_CALIB_T, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh))
 //       Serial.print("Calibration OK! ");
 //     else
 //       Serial.print("Calibration poor! ");
 
 //     Serial.printf("Thresholds on G string: 0x%04x - 0x%04x (avg: 0x%04x)\n", Gstr->touchThresh.min, Gstr->touchThresh.max, Gstr->touchThresh.avg);
-//     if (Gstr->touchCalDone) Gstr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Gstr->touchThresh);
+//     if (Gstr->touchCalDone) Gstr->saveToEeprom(CALIB_TYPE::R_CALIB_T, (uint8_t*)&Gstr->touchThresh);
 
 //     displayHelp();
 //   }
@@ -462,7 +462,7 @@ MACHINE_STATE parseRequests(HID_REQUESTS* req)
 //     Serial.println("\nExiting calibration. Values:");
 //     Serial.printf("G: adc -> %d - %d     touch -> %d\n", Gstr->adcRange.min, Gstr->adcRange.max, Gstr->touchThresh.avg);
 //     Serial.printf("E: adc -> %d - %d     touch -> %d\n", Estr->adcRange.min, Estr->adcRange.max, Estr->touchThresh.avg);
-//     machineState = MACHINE_STATE::IDLE;
+//     machineState = MACHINE_STATE::S_IDLE;
 //     displayHelp();
 //   }
 //   else
@@ -482,7 +482,7 @@ void measure()
   // Estr->adcNewVal   = false;
 
   // // adc->adc0->enableInterrupts(adc0_isr);
-  while (machineState == MACHINE_STATE::MEASURING)
+  while (machineState == MACHINE_STATE::S_MEAS)
   {
     // Gstr->measure(8);
     //   if ((touchVal = touchRead(Gstr->touchPin)) > 20000)
@@ -529,7 +529,7 @@ void measure()
       if (c == 'x')
       {
         // adc->adc0->disableInterrupts();
-        machineState = MACHINE_STATE::IDLE;
+        machineState = MACHINE_STATE::S_IDLE;
         displayHelp();
       }
     }
@@ -537,7 +537,7 @@ void measure()
 
   //   char c = 0;
 
-  //   while (machineState == MACHINE_STATE::MEASURING)
+  //   while (machineState == MACHINE_STATE::S_MEAS)
   //   {
   //     // Single reads
   //     Gstr->adcValue = measureString(Gstr->pin);
@@ -603,15 +603,15 @@ void displayString(uint16_t strVal)
 
 void displayHelp()
 {
-  if (machineState == MACHINE_STATE::IDLE)
+  if (machineState == MACHINE_STATE::S_IDLE)
   {
     Serial.print("'r' : calibrate string pressure RANGE\n't' : calibrate string TOUCH thresholds\n"
-                 "'m' : MEASURE string pressures (continuous)\n'v' : VIEW current calibration values\n"
-                 "'h' : display HELP\n'x' : EXIT calibration or measuring modes\n");
+                 "'m' : R_MEAS string pressures (continuous)\n'v' : R_VIEW current calibration values\n"
+                 "'h' : display R_HELP\n'x' : R_EXIT calibration or measuring modes\n");
   }
-  else if ((machineState == MACHINE_STATE::CALIB_RANGES_G) || (machineState == MACHINE_STATE::CALIB_TOUCH_G))
+  else if ((machineState == MACHINE_STATE::S_CR_G) || (machineState == MACHINE_STATE::S_CT_G))
   {
-    Serial.printf("'g': G string\n'e': E string\n'v': VIEW current calibrations\n'x': EXIT.\n");
+    Serial.printf("'g': G string\n'e': E string\n'v': R_VIEW current calibrations\n'x': R_EXIT.\n");
   }
 }
 
