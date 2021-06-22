@@ -207,14 +207,16 @@ bool vString::calibrate(CALIB_TYPE type, ADC_Module* module, range_t* range, thr
           if (val > range->max) range->max = val;
           if (val < range->min) range->min = val;
 
-          send[0] = (uint8_t)HID_NOTIF::N_CALIB_R;
-          send[1] = 6;
-          send[2] = ((range->min >> 8) & 0xff);
-          send[3] = (range->min) & 0xff;
-          send[4] = ((range->max >> 8) & 0xff);
-          send[5] = (range->max) & 0xff;
-          send[6] = (uint8_t)MACHINE_STATE::S_CALIB_R;
-          send[7] = (uint8_t)HID_NOTIF::N_END;
+          send[0] = (uint8_t)HID_NOTIF::N_INFO;
+          send[1] = 8;
+          send[2] = (uint8_t)HID_NOTIF::N_CALIB_R;
+          send[3] = number;
+          send[4] = ((range->min >> 8) & 0xff);
+          send[5] = (range->min) & 0xff;
+          send[6] = ((range->max >> 8) & 0xff);
+          send[7] = (range->max) & 0xff;
+          send[8] = (uint8_t)MACHINE_STATE::S_CALIB_R;
+          send[9] = (uint8_t)HID_NOTIF::N_END;
           RawHID.send(send, 64);
 
           delta = 0;
