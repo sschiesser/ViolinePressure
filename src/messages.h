@@ -4,21 +4,21 @@
 #include <Arduino.h>
 
 enum class HID_REQ : uint8_t {
-  // request type headers (< 0x20)
+  // request type headers (val < 0x20)
   R_CMD = 0x10,
-  // requests values (0x20 <= val <= 0x7E)
-  R_STR_A   = 'A',
-  R_STR_D   = 'D',
-  R_STR_E   = 'E',
-  R_STR_G   = 'G',
-  R_HELP    = 'h',
-  R_MEAS    = 'm',
-  R_CALIB_R = 'r',
-  R_CALIB_T = 't',
-  R_VIEW    = 'v',
-  R_EXIT    = 'x',
+  // request values (0x20 <= val <= 0x7E)
+  R_STR_A   = 'A', // 0x41
+  R_STR_D   = 'D', // 0x44
+  R_STR_E   = 'E', // 0x45
+  R_STR_G   = 'G', // 0x47
+  R_HELP    = 'h', // 0x68
+  R_MEAS    = 'm', // 0x6D
+  R_CALIB_R = 'r', // 0x72
+  R_CALIB_T = 't', // 0x74
+  R_VIEW    = 'v', // 0x76
+  R_EXIT    = 'x', //0x78
   // request end delimiter
-  R_END = 0xFF,
+  R_END = 0xFF
 };
 
 enum class HID_NOTIF : uint8_t {
