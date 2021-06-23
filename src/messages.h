@@ -28,9 +28,9 @@ enum class HID_NOTIF : uint8_t {
   N_INFO = 0x02,
   // notification values
   N_CALIB_R = (uint8_t)HID_REQ::R_CALIB_R,
-  N_CR_DONE = 0x21,
+  // N_CR_DONE = 0x21,
   N_CALIB_T = (uint8_t)HID_REQ::R_CALIB_T,
-  N_CT_DONE = 0x31,
+  // N_CT_DONE = 0x31,
   N_VIEW    = (uint8_t)HID_REQ::R_VIEW,
   N_EXIT    = (uint8_t)HID_REQ::R_EXIT,
   N_STR_E   = (uint8_t)HID_REQ::R_STR_E,
