@@ -24,7 +24,7 @@ enum class HID_REQ : uint8_t {
 enum class HID_NOTIF : uint8_t {
   // notification type headers
   N_MEAS = 0x00,
-  N_ACK  = 0x01,
+  // N_ACK  = 0x01,
   N_INFO = 0x02,
   // notification values
   N_CALIB_R = (uint8_t)HID_REQ::R_CALIB_R,

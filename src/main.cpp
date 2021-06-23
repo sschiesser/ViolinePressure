@@ -88,8 +88,6 @@ void loop()
       notif[1] = 8;
       notif[2] = ((deltaMs >> 8) & 0xff);
       notif[3] = (deltaMs & 0xff);
-      // notif[2] = ((deltaUs >> 8) & 0xff);
-      // notif[3] = (deltaUs & 0xff);
       notif[4] = ((gVal >> 8) & 0xff);
       notif[5] = (gVal & 0xff);
       notif[6] = ((eVal >> 8) & 0xff);
@@ -143,7 +141,7 @@ MACHINE_STATE parseRequests(HID_REQ* req)
   if (msgFormat)
   {
     uint8_t notif[64] = {0};
-    notif[0]          = (uint8_t)HID_NOTIF::N_ACK;
+    notif[0]          = (uint8_t)HID_NOTIF::N_INFO;
 
     switch ((HID_REQ)req[2])
     {
@@ -159,10 +157,10 @@ MACHINE_STATE parseRequests(HID_REQ* req)
       }
 
       case HID_REQ::R_CALIB_R: {
-        notif[1]            = 4;
-        notif[2]            = (uint8_t)HID_NOTIF::N_CALIB_R;
-        notif[4]            = (uint8_t)machineState;
-        notif[notif[1] + 1] = (uint8_t)HID_NOTIF::N_END;
+        notif[1] = 4;
+        notif[2] = (uint8_t)HID_NOTIF::N_CALIB_R;
+        notif[4] = (uint8_t)machineState;
+        notif[5] = (uint8_t)HID_NOTIF::N_END;
         if (req[3] == HID_REQ::R_STR_G)
         {
           notif[3] = (uint8_t)HID_NOTIF::N_STR_G;

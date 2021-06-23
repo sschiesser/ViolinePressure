@@ -1,7 +1,7 @@
 #ifndef VSTRING_H
 #define VSTRING_H
 
-// #include "main.h"
+#include "main.h"
 #include <ADC.h>
 #include <Arduino.h>
 #include <EEPROM.h>
@@ -43,10 +43,7 @@ class vString
   uint8_t adcPin;
   range_t adcRange;
   bool adcCalDone;
-  // uint16_t adcBuf[BUFFER_SIZE];
-  // uint16_t bufHead, bufTail;
-  // uint16_t adcCurVal;
-  // uint16_t adcDispValue;
+
 
   uint8_t touchPin;
   uint16_t touchBuf[BUFFER_SIZE];
