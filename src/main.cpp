@@ -257,19 +257,36 @@ MACHINE_STATE parseRequests(HID_REQ* req)
  * ****************************************************************************/
 void adc0_isr()
 {
-  uint16_t val = adc->adc0->readSingle();
-  uint8_t pin  = ADC::sc1a2channelADC0[ADC0_SC1A & ADC_SC1A_CHANNELS];
+  uint8_t pin = ADC::sc1a2channelADC0[ADC0_SC1A & ADC_SC1A_CHANNELS];
   if (pin == Estr->adcPin)
   {
-    Estr->adcVal    = val;
+    if (touchRead(Estr->touchPin) > (int)(1.1 * (float)Estr->touchThresh.min))
+    {
+      Estr->adcVal = adc->adc0->readSingle();
+    }
+    else
+    {
+      Estr->adcVal = 0;
+    }
     Estr->adcNewVal = true;
     adc->adc0->startSingleRead(Gstr->adcPin);
   }
   else if (pin == Gstr->adcPin)
   {
-    Gstr->adcVal    = val;
+    if (touchRead(Gstr->touchPin) > (int)(1.1 * (float)Gstr->touchThresh.min))
+    {
+      Gstr->adcVal = adc->adc0->readSingle();
+    }
+    else
+    {
+      Gstr->adcVal = 0;
+    }
     Gstr->adcNewVal = true;
     adc->adc0->startSingleRead(Estr->adcPin);
+  }
+  else
+  {
+    adc->readSingle();
   }
 
   if (adc->adc0->adcWasInUse)
