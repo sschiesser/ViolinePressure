@@ -5,16 +5,11 @@
 #include <Arduino.h>
 #include <EEPROM.h>
 
-// elapsedMillis gDetla, eDelta;
 elapsedMillis deltaMs;
 elapsedMicros deltaUs;
 ADC* adc      = new ADC(); // adc object;
-vString* Gstr = new vString(0, A0, 'G', (uint8_t)HID_NOTIF::N_STR_G);
-// vString* Dstr = new vString(6, A2, 'D', 1);
-// vString* Astr = new vString(4, A3, 'A', 2);
-vString* Estr = new vString(1, A1, 'E', (uint8_t)HID_NOTIF::N_STR_E);
-// uint8_t buffer[64];
-uint32_t start;
+vString* Gstr = new vString(GSTR_TOUCH_PIN, GSTR_ADC_PIN, GSTR_NAME_CHAR, (uint8_t)HID_NOTIF::N_STR_G);
+vString* Estr = new vString(ESTR_TOUCH_PIN, ESTR_ADC_PIN, ESTR_NAME_CHAR, (uint8_t)HID_NOTIF::N_STR_E);
 
 MACHINE_STATE machineState = MACHINE_STATE::S_IDLE;
 
@@ -23,20 +18,17 @@ void setup()
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
 
-  // Serial.begin(115200);
-  // delay(1000);
-
-  adc->adc0->setAveraging(32);                                         // set number of averages
-  adc->adc0->setResolution(10);                                        // set bits of resolution
-  adc->adc0->setConversionSpeed(ADC_CONVERSION_SPEED::VERY_LOW_SPEED); // change the conversion speed
-  adc->adc0->setSamplingSpeed(ADC_SAMPLING_SPEED::VERY_LOW_SPEED);     // change the sampling speed
+  adc->adc0->setAveraging(16);                                            // set number of averages
+  adc->adc0->setResolution(16);                                           // set bits of resolution
+  adc->adc0->setConversionSpeed(ADC_CONVERSION_SPEED::HIGH_SPEED_16BITS); // change the conversion speed
+  adc->adc0->setSamplingSpeed(ADC_SAMPLING_SPEED::HIGH_SPEED);            // change the sampling speed
 }
 
 void loop()
 {
   HID_REQ req[64];
   uint8_t notif[64];
-  uint16_t eVal, gVal;
+  static uint16_t eVal, gVal;
   uint8_t n = RawHID.recv(req, 0);
   if (n > 0)
   {
@@ -45,7 +37,7 @@ void loop()
 
   switch (machineState)
   {
-    case MACHINE_STATE::S_CT_E:
+    case MACHINE_STATE::S_CT_E: {
       Estr->resetCalibValues(CALIB_TYPE::CALIB_TOUCH);
       Estr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Estr->touchThresh);
       Estr->calibrate(CALIB_TYPE::CALIB_TOUCH, adc->adc0, &Estr->adcRange, &Estr->touchThresh);
@@ -53,8 +45,9 @@ void loop()
       if (Estr->touchCalDone)
         Estr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Estr->touchThresh);
       break;
+    }
 
-    case MACHINE_STATE::S_CT_G:
+    case MACHINE_STATE::S_CT_G: {
       Gstr->resetCalibValues(CALIB_TYPE::CALIB_TOUCH);
       Gstr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Gstr->touchThresh);
       Gstr->calibrate(CALIB_TYPE::CALIB_TOUCH, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh);
@@ -62,8 +55,9 @@ void loop()
       if (Gstr->touchCalDone)
         Gstr->saveToEeprom(CALIB_TYPE::CALIB_TOUCH, (uint8_t*)&Gstr->touchThresh);
       break;
+    }
 
-    case MACHINE_STATE::S_CR_E:
+    case MACHINE_STATE::S_CR_E: {
       Estr->resetCalibValues(CALIB_TYPE::CALIB_RANGE);
       Estr->saveToEeprom(CALIB_TYPE::CALIB_RANGE, (uint8_t*)&Estr->adcRange);
       Estr->calibrate(CALIB_TYPE::CALIB_RANGE, adc->adc0, &Estr->adcRange, &Estr->touchThresh);
@@ -71,8 +65,9 @@ void loop()
       if (Estr->adcCalDone)
         Estr->saveToEeprom(CALIB_TYPE::CALIB_RANGE, (uint8_t*)&Estr->adcRange);
       break;
+    }
 
-    case MACHINE_STATE::S_CR_G:
+    case MACHINE_STATE::S_CR_G: {
       Gstr->resetCalibValues(CALIB_TYPE::CALIB_RANGE);
       Gstr->saveToEeprom(CALIB_TYPE::CALIB_RANGE, (uint8_t*)&Gstr->adcRange);
       Gstr->calibrate(CALIB_TYPE::CALIB_RANGE, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh);
@@ -80,26 +75,32 @@ void loop()
       if (Gstr->adcCalDone)
         Gstr->saveToEeprom(CALIB_TYPE::CALIB_RANGE, (uint8_t*)&Gstr->adcRange);
       break;
+    }
 
     case MACHINE_STATE::S_MEAS: {
-      gVal     = Gstr->measure(adc->adc0, 10);
-      eVal     = Estr->measure(adc->adc0, 10);
-      notif[0] = (uint8_t)HID_NOTIF::N_MEAS;
-      notif[1] = 8;
-      // notif[2] = ((deltaMs >> 8) & 0xff);
-      // notif[3] = (deltaMs & 0xff);
-      notif[2] = ((deltaUs >> 8) & 0xff);
-      notif[3] = (deltaUs & 0xff);
-      notif[4] = ((gVal >> 8) & 0xff);
-      notif[5] = (gVal & 0xff);
-      notif[6] = ((eVal >> 8) & 0xff);
-      notif[7] = (eVal & 0xff);
-      notif[8] = (uint8_t)machineState;
-      notif[9] = (uint8_t)HID_NOTIF::N_END;
-      RawHID.send(notif, HID_TIMEOUT_MAX);
-      deltaUs = 0;
-      deltaMs = 0;
-      // delay(2);
+      if ((Gstr->adcNewVal) && (Estr->adcNewVal))
+      {
+        gVal            = Gstr->adcVal;
+        eVal            = Estr->adcVal;
+        Gstr->adcNewVal = false;
+        Estr->adcNewVal = false;
+        if (deltaUs > 10)
+        {
+          notif[0] = (uint8_t)HID_NOTIF::N_MEAS;
+          notif[1] = 8;
+          notif[2] = ((deltaUs >> 8) & 0xff);
+          notif[3] = (deltaUs & 0xff);
+          notif[4] = ((gVal >> 8) & 0xff);
+          notif[5] = (gVal & 0xff);
+          notif[6] = ((eVal >> 8) & 0xff);
+          notif[7] = (eVal & 0xff);
+          notif[8] = (uint8_t)machineState;
+          notif[9] = (uint8_t)HID_NOTIF::N_END;
+          RawHID.send(notif, HID_TIMEOUT_MAX);
+          deltaUs = 0;
+          deltaMs = 0;
+        }
+      }
       break;
     }
 
@@ -142,8 +143,8 @@ MACHINE_STATE parseRequests(HID_REQ* req)
   /* Request format is matching the expectations: we can parse the message */
   if (msgFormat)
   {
-    uint8_t notif[64] = {0};
-    notif[0]          = (uint8_t)HID_NOTIF::N_INFO;
+    uint8_t notif[HID_PACK_SIZE_MAX] = {0};
+    notif[0]                         = (uint8_t)HID_NOTIF::N_INFO;
 
     switch ((HID_REQ)req[2])
     {
@@ -152,9 +153,13 @@ MACHINE_STATE parseRequests(HID_REQ* req)
         notif[2] = (uint8_t)HID_NOTIF::N_MEAS;
         notif[3] = (uint8_t)machineState;
         notif[4] = (uint8_t)HID_NOTIF::N_END;
-        retVal   = MACHINE_STATE::S_MEAS;
-        deltaUs  = 0;
-        deltaMs  = 0;
+
+        adc->adc0->enableInterrupts(adc0_isr);
+        adc->adc0->startSingleRead(Estr->adcPin);
+
+        retVal  = MACHINE_STATE::S_MEAS;
+        deltaUs = 0;
+        deltaMs = 0;
         break;
       }
 
@@ -217,7 +222,13 @@ MACHINE_STATE parseRequests(HID_REQ* req)
         notif[2] = (uint8_t)HID_NOTIF::N_EXIT;
         notif[3] = (uint8_t)machineState;
         notif[4] = (uint8_t)HID_NOTIF::N_END;
-        retVal   = MACHINE_STATE::S_IDLE;
+        if (machineState == MACHINE_STATE::S_MEAS)
+        {
+          adc->adc0->disableInterrupts();
+          // adc->adc0->stopContinuous();
+        }
+
+        retVal = MACHINE_STATE::S_IDLE;
         break;
       }
 
@@ -236,393 +247,33 @@ MACHINE_STATE parseRequests(HID_REQ* req)
   return retVal;
 }
 
-//   case HID_REQUESTS::N_STR_E:
-//   case HID_REQUESTS::N_STR_G:
-//     if (machineState == MACHINE_STATE::R_CALIB_R)
-//     {
-//       send[1] = (byte)cmd;
-//       send[2] = (byte)machineState;
-//       RawHID.send(send, HID_TIMEOUT_MAX);
-//       if (cmd == HID_REQUESTS::N_STR_E)
-//         Estr->calibrate(CALIB_TYPE::CALIB_RANGE, adc->adc0, &Estr->adcRange, &Estr->touchThresh);
-//       else
-//         Gstr->calibrate(CALIB_TYPE::CALIB_RANGE, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh);
-//     }
-//     else if (machineState == MACHINE_STATE::R_CALIB_T)
-//     {
-//       send[1] = (byte)cmd;
-//       send[2] = (byte)machineState;
-//       RawHID.send(send, HID_TIMEOUT_MAX);
-//       if (cmd == HID_REQUESTS::N_STR_E)
-//       {
-//         Estr->resetCalibValues(CALIB_TYPE::R_CALIB_T);
-//         Estr->saveToEeprom(CALIB_TYPE::R_CALIB_T, (uint8_t*)&Estr->touchThresh);
-//         Estr->calibrate(CALIB_TYPE::R_CALIB_T, adc->adc0, &Estr->adcRange, &Estr->touchThresh);
-//         if (Estr->touchCalDone) Estr->saveToEeprom(CALIB_TYPE::R_CALIB_T, (uint8_t*)&Estr->touchThresh);
-//       }
-//       else
-//       {
-//         Gstr->resetCalibValues(CALIB_TYPE::R_CALIB_T);
-//         Gstr->saveToEeprom(CALIB_TYPE::R_CALIB_T, (uint8_t*)&Gstr->touchThresh);
-//         Gstr->calibrate(CALIB_TYPE::R_CALIB_T, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh);
-//         if (Gstr->touchCalDone) Gstr->saveToEeprom(CALIB_TYPE::R_CALIB_T, (uint8_t*)&Gstr->touchThresh);
-//       }
-//     }
-//     else
-//     {
-//       send[1] = (byte)HID_REQUESTS::ERR_NOCMD;
-//       send[2] = (byte)machineState;
-//       RawHID.send(send, HID_TIMEOUT_MAX);
-//     }
-//     break;
-
-//   case HID_REQUESTS::R_CALIB_R:
-//   case HID_REQUESTS::R_CALIB_T:
-//     if (machineState == MACHINE_STATE::S_IDLE)
-//     {
-//       send[1] = (byte)cmd;
-//       if (cmd == HID_REQUESTS::R_CALIB_R)
-//       {
-//         machineState = MACHINE_STATE::R_CALIB_R;
-//         send[2]      = (byte)machineState;
-//         RawHID.send(send, HID_TIMEOUT_MAX);
-//       }
-//       if (cmd == HID_REQUESTS::R_CALIB_T)
-//       {
-//         machineState = MACHINE_STATE::R_CALIB_T;
-//         send[2]      = (byte)machineState;
-//         RawHID.send(send, HID_TIMEOUT_MAX);
-//         // calibrateTouch();
-//       }
-//     }
-//     else
-//     {
-//       send[1]      = (byte)HID_REQUESTS::ERR_NOCMD;
-//       machineState = MACHINE_STATE::S_IDLE;
-//       send[2]      = (byte)machineState;
-//       RawHID.send(send, HID_TIMEOUT_MAX);
-//     }
-
-//     break;
-
-//   case HID_REQUESTS::R_MEAS:
-//     if (machineState == MACHINE_STATE::S_IDLE)
-//     {
-//       send[1]      = (byte)cmd;
-//       machineState = MACHINE_STATE::S_MEAS;
-//       send[2]      = (byte)machineState;
-//       RawHID.send(send, HID_TIMEOUT_MAX);
-//     }
-//     else
-//     {
-//       send[1] = (byte)HID_REQUESTS::ERR_NOCMD;
-//       send[2] = (byte)machineState;
-//       RawHID.send(send, HID_TIMEOUT_MAX);
-//     }
-//     break;
-
-//   case HID_REQUESTS::R_HELP:
-//     if ((machineState == MACHINE_STATE::S_IDLE) || (machineState == MACHINE_STATE::R_CALIB_R) || (machineState == MACHINE_STATE::R_CALIB_T))
-//     {
-//       send[1] = (byte)cmd;
-//       send[2] = (byte)machineState;
-//       RawHID.send(send, HID_TIMEOUT_MAX);
-//     }
-//     else
-//     {
-//       send[1] = (byte)HID_REQUESTS::ERR_NOCMD;
-//       send[2] = (byte)machineState;
-//       RawHID.send(send, HID_TIMEOUT_MAX);
-//     }
-
-//   case HID_REQUESTS::R_VIEW:
-//     if ((machineState == MACHINE_STATE::S_IDLE) || (machineState == MACHINE_STATE::R_CALIB_R) || (machineState == MACHINE_STATE::R_CALIB_T))
-//     {
-//       send[1]  = (byte)cmd;
-//       send[2]  = (byte)((Gstr->adcRange.min >> 8) & 0xff);
-//       send[3]  = (byte)(Gstr->adcRange.min & 0xff);
-//       send[4]  = (byte)((Gstr->adcRange.max >> 8) & 0xff);
-//       send[5]  = (byte)(Gstr->adcRange.max & 0xff);
-//       send[6]  = (byte)((Gstr->touchThresh.avg >> 8) & 0xff);
-//       send[7]  = (byte)(Gstr->touchThresh.avg & 0xff);
-//       send[8]  = (byte)((Estr->adcRange.min >> 8) & 0xff);
-//       send[9]  = (byte)(Estr->adcRange.min & 0xff);
-//       send[10] = (byte)((Estr->adcRange.max >> 8) & 0xff);
-//       send[11] = (byte)(Estr->adcRange.max & 0xff);
-//       send[12] = (byte)((Estr->touchThresh.avg >> 8) & 0xff);
-//       send[13] = (byte)(Estr->touchThresh.avg & 0xff);
-//       send[14] = (byte)machineState;
-//       RawHID.send(send, HID_TIMEOUT_MAX);
-//     }
-//     else
-//     {
-//       send[1] = (byte)HID_REQUESTS::ERR_NOCMD;
-//       send[2] = (byte)machineState;
-//       RawHID.send(send, HID_TIMEOUT_MAX);
-//     }
-//     break;
-
-//   case HID_REQUESTS::R_EXIT:
-//     send[1]      = (byte)cmd;
-//     machineState = MACHINE_STATE::S_IDLE;
-//     send[2]      = (byte)machineState;
-//     RawHID.send(send, HID_TIMEOUT_MAX);
-//     break;
-
-//   default:
-//     send[1] = (byte)HID_REQUESTS::ERR_NOCMD;
-//     send[2] = (byte)machineState;
-//     RawHID.send(send, HID_TIMEOUT_MAX);
-//     break;
-// }
-// }
-
-// void calibrateRange(vString* str)
-// {
-// if (str->touchCalDone)
-// {
-// str->resetCalibValues(CALIB_TYPE::CALIB_RANGE);
-// str->saveToEeprom(CALIB_TYPE::CALIB_RANGE, (uint8_t*)&str->adcRange);
-// if (str->calibrate(CALIB_TYPE::CALIB_RANGE, adc->adc0, &str->adcRange, &str->touchThresh))
-// str->calibrate(CALIB_TYPE::CALIB_RANGE, adc->adc0, &str->adcRange, &str->touchThresh);
-//   Serial.print("Calibration OK! ");
-// else
-//   Serial.print("Calibration poor! ");
-
-// Serial.printf("Values on E string: 0x%04x - 0x%04x\n", str->adcRange.min, str->adcRange.max);
-// if (str->adcCalDone) Estr->saveToEeprom(CALIB_TYPE::CALIB_RANGE, (uint8_t*)&str->adcRange);
-// displayHelp();
-// }
-// else
-// {
-//   Serial.println("Please calibrate the string touch thresholds first");
-// }
-// }
-
-// void calibrateTouch(vString* str)
-// {
-// char c = 0;
-
-// Serial.println("Calibrate touch thresholds.");
-// displayHelp();
-// while (machineState == MACHINE_STATE::R_CALIB_T)
-// {
-//   str->calibrate(CALIB_TYPE::R_CALIB_T, adc->adc0, &str->adcRange, &str->touchThresh);
-//   while (!Serial.available())
-//     ;
-
-//   c = Serial.read();
-//   if (c == 'a')
-//   {
-//     Serial.println("A string not available yet!");
-//   }
-//   else if (c == 'd')
-//   {
-//     Serial.println("D string not available yet!");
-//   }
-//   else if (c == 'e')
-//   {
-//     Serial.printf("Calibrating E string...\nTouch the string at different places on different manners ('x' to finish (t: %d, a:%d))\n", Estr->touchPin, Estr->adcPin);
-//     Estr->resetCalibValues(CALIB_TYPE::R_CALIB_T);
-//     Estr->saveToEeprom(CALIB_TYPE::R_CALIB_T, (uint8_t*)&Estr->touchThresh);
-//     if (Estr->calibrate(CALIB_TYPE::R_CALIB_T, adc->adc0, &Estr->adcRange, &Estr->touchThresh))
-//       Serial.print("Calibration OK! ");
-//     else
-//       Serial.print("Calibration poor! ");
-
-//     Serial.printf("Thresholds on E string: 0x%04x - 0x%04x (avg: 0x%04x)\n", Estr->touchThresh.min, Estr->touchThresh.max, Estr->touchThresh.avg);
-//     if (Estr->touchCalDone) Estr->saveToEeprom(CALIB_TYPE::R_CALIB_T, (uint8_t*)&Estr->touchThresh);
-
-//     displayHelp();
-//   }
-//   else if (c == 'g')
-//   {
-//     Serial.printf("Calibrating G string...\nTouch the string at different places on different manners ('x' to finish (t: %d, a:%d))\n", Gstr->touchPin, Gstr->adcPin);
-//     Gstr->resetCalibValues(CALIB_TYPE::R_CALIB_T);
-//     Gstr->saveToEeprom(CALIB_TYPE::R_CALIB_T, (uint8_t*)&Gstr->touchThresh);
-//     if (Gstr->calibrate(CALIB_TYPE::R_CALIB_T, adc->adc0, &Gstr->adcRange, &Gstr->touchThresh))
-//       Serial.print("Calibration OK! ");
-//     else
-//       Serial.print("Calibration poor! ");
-
-//     Serial.printf("Thresholds on G string: 0x%04x - 0x%04x (avg: 0x%04x)\n", Gstr->touchThresh.min, Gstr->touchThresh.max, Gstr->touchThresh.avg);
-//     if (Gstr->touchCalDone) Gstr->saveToEeprom(CALIB_TYPE::R_CALIB_T, (uint8_t*)&Gstr->touchThresh);
-
-//     displayHelp();
-//   }
-//   else if (c == 'v')
-//   {
-//     Serial.println("Current calibration values");
-//     Gstr->viewCalibValues();
-//     Estr->viewCalibValues();
-//     displayHelp();
-//   }
-//   else if (c == 'x')
-//   {
-//     Serial.println("\nExiting calibration. Values:");
-//     Serial.printf("G: adc -> %d - %d     touch -> %d\n", Gstr->adcRange.min, Gstr->adcRange.max, Gstr->touchThresh.avg);
-//     Serial.printf("E: adc -> %d - %d     touch -> %d\n", Estr->adcRange.min, Estr->adcRange.max, Estr->touchThresh.avg);
-//     machineState = MACHINE_STATE::S_IDLE;
-//     displayHelp();
-//   }
-//   else
-//   {
-//     Serial.println("Please choose a valid option");
-//   }
-// }
-// }
-
-void measure()
-{
-  // uint16_t adcVal   = 0;
-  // uint16_t touchVal = 0;
-  // uint32_t eStart   = millis();
-  // uint32_t gStart   = millis();
-  // Gstr->adcNewVal   = false;
-  // Estr->adcNewVal   = false;
-
-  // // adc->adc0->enableInterrupts(adc0_isr);
-  while (machineState == MACHINE_STATE::S_MEAS)
-  {
-    // Gstr->measure(8);
-    //   if ((touchVal = touchRead(Gstr->touchPin)) > 20000)
-    //   {
-    //     adcVal = adc->adc0->analogRead(Gstr->adcPin);
-
-    //     // if ((Gstr->adcTail + 1) < Gstr->bufferSize)
-    //     //   Gstr->adcTail++;
-    //     // else
-    //     //   Gstr->adcTail = 0;
-
-    //     // adcVal = Gstr->adcBuffer[Gstr->adcTail];
-    //     if ((millis() - gStart) > 100)
-    //     {
-    //       Serial.print(gDetla);
-    //       Serial.printf(" G: %d - %d\n", touchVal, adcVal);
-    //       gDetla = 0;
-    //       gStart = millis();
-    //     }
-    //   }
-
-    //   if ((touchVal = touchRead(Estr->touchPin)) > 20000)
-    //   {
-    //     adcVal = adc->adc0->analogRead(Estr->adcPin);
-
-    //     // if ((Estr->adcTail + 1) < Estr->bufferSize)
-    //     //   Estr->adcTail++;
-    //     // else
-    //     //   Estr->adcTail = 0;
-
-    //     // adcVal       = Estr->adcBuffer[Estr->adcTail];
-    //     if ((millis() - eStart) > 100)
-    //     {
-    //       Serial.print(eDelta);
-    //       Serial.printf(" E: %d - %d\n", touchVal, adcVal);
-    //       eDelta = 0;
-    //       eStart = millis();
-    //     }
-    //   }
-
-    if (Serial.available())
-    {
-      char c = Serial.read();
-      if (c == 'x')
-      {
-        // adc->adc0->disableInterrupts();
-        machineState = MACHINE_STATE::S_IDLE;
-        displayHelp();
-      }
-    }
-  }
-
-  //   char c = 0;
-
-  //   while (machineState == MACHINE_STATE::S_MEAS)
-  //   {
-  //     // Single reads
-  //     Gstr->adcValue = measureString(Gstr->pin);
-  //     Estr->adcValue = measureString(Estr->pin);
-
-  //     Serial.print("G: ");
-  //     displayString(strValues[0]);
-
-  //     Serial.print("E: ");
-  //     displayString(strValues[1]);
-
-  //     Serial.println("");
-  //     // Print errors, if any.
-  //     if (adc->adc0->fail_flag != ADC_ERROR::CLEAR)
-  //     {
-  //       Serial.print("ADC0: ");
-  //       Serial.println(getStringADCError(adc->adc0->fail_flag));
-  //     }
-
-  //   }
-}
-
-// void displayRange(range_t range)
-// {
-//   range_t localRange = {.min = UINT16_MAX, .max = 0};
-//   uint8_t dispMin     = 0;
-//   uint8_t dispMax     = 0;
-
-//   if (range.min < localRange.min)
-//   {
-//     localRange.min = range.min;
-//     dispMin        = 100 * localRange.min / 1023;
-//     // Serial.printf("New min: %d\n", localRange.min);
-//   }
-//   if (range.max > localRange.max)
-//   {
-//     localRange.max = range.max;
-//     dispMax        = 100 * localRange.max / 1023;
-//     // Serial.printf("New max: %d\n", localRange.max);
-//   }
-//   Serial.printf("\r[");
-//   for (int i = 0; i < 100; i++)
-//   {
-//     if (i < dispMin)
-//       Serial.printf(" ");
-//     else if ((i > dispMin) && (i < dispMax))
-//       Serial.printf("*");
-//     else if (i > dispMax)
-//       Serial.printf(" ");
-//   }
-//   Serial.printf("]\n");
-// }
-
-void displayString(uint16_t strVal)
-{
-  uint8_t disp = uint8_t(strVal * 99 / adc->adc0->getMaxValue());
-  for (int i = 0; i < disp; i++)
-  {
-    Serial.print("*");
-  }
-  Serial.println("");
-}
-
-void displayHelp()
-{
-  if (machineState == MACHINE_STATE::S_IDLE)
-  {
-    Serial.print("'r' : calibrate string pressure RANGE\n't' : calibrate string TOUCH thresholds\n"
-                 "'m' : R_MEAS string pressures (continuous)\n'v' : R_VIEW current calibration values\n"
-                 "'h' : display R_HELP\n'x' : R_EXIT calibration or measuring modes\n");
-  }
-  else if ((machineState == MACHINE_STATE::S_CR_G) || (machineState == MACHINE_STATE::S_CT_G))
-  {
-    Serial.printf("'g': G string\n'e': E string\n'v': R_VIEW current calibrations\n'x': R_EXIT.\n");
-  }
-}
-
-// If you enable interrupts make sure to call readSingle() to clear the interrupt.
+/* ****************************************************************************
+ * void adc0_isr
+ * ----------------------------------------------------------------------------
+ * !!! MAKE SURE TO CALL readSingle() TO CLEAR THE INTERRUPT !!!
+ * 
+ * Check on which pin the ADC channel was set and set the corresponding
+ * value & flag. Then start a new singleRead on a next pin.
+ * ****************************************************************************/
 void adc0_isr()
 {
-  adc->readSingle();
+  uint16_t val = adc->adc0->readSingle();
+  uint8_t pin  = ADC::sc1a2channelADC0[ADC0_SC1A & ADC_SC1A_CHANNELS];
+  if (pin == Estr->adcPin)
+  {
+    Estr->adcVal    = val;
+    Estr->adcNewVal = true;
+    adc->adc0->startSingleRead(Gstr->adcPin);
+  }
+  else if (pin == Gstr->adcPin)
+  {
+    Gstr->adcVal    = val;
+    Gstr->adcNewVal = true;
+    adc->adc0->startSingleRead(Estr->adcPin);
+  }
 
   if (adc->adc0->adcWasInUse)
   {
-    // Serial.println("In use");
     adc->adc0->loadConfig(&adc->adc0->adc_config);
     adc->adc0->adcWasInUse = false;
   }
