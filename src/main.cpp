@@ -90,19 +90,22 @@ void loop()
         eVal            = Estr->adcVal;
         Gstr->adcNewVal = false;
         Estr->adcNewVal = false;
-        notif[0]        = (uint8_t)HID_NOTIF::N_MEAS;
-        notif[1]        = 8;
-        notif[2]        = ((deltaUs >> 8) & 0xff);
-        notif[3]        = (deltaUs & 0xff);
-        notif[4]        = ((gVal >> 8) & 0xff);
-        notif[5]        = (gVal & 0xff);
-        notif[6]        = ((eVal >> 8) & 0xff);
-        notif[7]        = (eVal & 0xff);
-        notif[8]        = (uint8_t)machineState;
-        notif[9]        = (uint8_t)HID_NOTIF::N_END;
-        RawHID.send(notif, HID_TIMEOUT_MAX);
-        deltaUs = 0;
-        deltaMs = 0;
+        if (deltaUs > 1000)
+        {
+          notif[0] = (uint8_t)HID_NOTIF::N_MEAS;
+          notif[1] = 8;
+          notif[2] = ((deltaUs >> 8) & 0xff);
+          notif[3] = (deltaUs & 0xff);
+          notif[4] = ((gVal >> 8) & 0xff);
+          notif[5] = (gVal & 0xff);
+          notif[6] = ((eVal >> 8) & 0xff);
+          notif[7] = (eVal & 0xff);
+          notif[8] = (uint8_t)machineState;
+          notif[9] = (uint8_t)HID_NOTIF::N_END;
+          RawHID.send(notif, HID_TIMEOUT_MAX);
+          deltaUs = 0;
+          deltaMs = 0;
+        }
 
         // delayMicroseconds(1);
       }
