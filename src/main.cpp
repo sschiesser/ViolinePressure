@@ -86,15 +86,17 @@ void loop()
       eVal     = Estr->measure(adc->adc0, 10);
       notif[0] = (uint8_t)HID_NOTIF::N_MEAS;
       notif[1] = 8;
-      notif[2] = ((deltaMs >> 8) & 0xff);
-      notif[3] = (deltaMs & 0xff);
+      // notif[2] = ((deltaMs >> 8) & 0xff);
+      // notif[3] = (deltaMs & 0xff);
+      notif[2] = ((deltaUs >> 8) & 0xff);
+      notif[3] = (deltaUs & 0xff);
       notif[4] = ((gVal >> 8) & 0xff);
       notif[5] = (gVal & 0xff);
       notif[6] = ((eVal >> 8) & 0xff);
       notif[7] = (eVal & 0xff);
       notif[8] = (uint8_t)machineState;
       notif[9] = (uint8_t)HID_NOTIF::N_END;
-      RawHID.send(notif, 2);
+      RawHID.send(notif, HID_TIMEOUT_MAX);
       deltaUs = 0;
       deltaMs = 0;
       // delay(2);
@@ -228,7 +230,7 @@ MACHINE_STATE parseRequests(HID_REQ* req)
       }
     }
 
-    RawHID.send(notif, 50);
+    RawHID.send(notif, HID_TIMEOUT_MAX);
   }
 
   return retVal;
@@ -240,7 +242,7 @@ MACHINE_STATE parseRequests(HID_REQ* req)
 //     {
 //       send[1] = (byte)cmd;
 //       send[2] = (byte)machineState;
-//       RawHID.send(send, 64);
+//       RawHID.send(send, HID_TIMEOUT_MAX);
 //       if (cmd == HID_REQUESTS::N_STR_E)
 //         Estr->calibrate(CALIB_TYPE::CALIB_RANGE, adc->adc0, &Estr->adcRange, &Estr->touchThresh);
 //       else
@@ -250,7 +252,7 @@ MACHINE_STATE parseRequests(HID_REQ* req)
 //     {
 //       send[1] = (byte)cmd;
 //       send[2] = (byte)machineState;
-//       RawHID.send(send, 64);
+//       RawHID.send(send, HID_TIMEOUT_MAX);
 //       if (cmd == HID_REQUESTS::N_STR_E)
 //       {
 //         Estr->resetCalibValues(CALIB_TYPE::R_CALIB_T);
@@ -270,7 +272,7 @@ MACHINE_STATE parseRequests(HID_REQ* req)
 //     {
 //       send[1] = (byte)HID_REQUESTS::ERR_NOCMD;
 //       send[2] = (byte)machineState;
-//       RawHID.send(send, 64);
+//       RawHID.send(send, HID_TIMEOUT_MAX);
 //     }
 //     break;
 
@@ -283,13 +285,13 @@ MACHINE_STATE parseRequests(HID_REQ* req)
 //       {
 //         machineState = MACHINE_STATE::R_CALIB_R;
 //         send[2]      = (byte)machineState;
-//         RawHID.send(send, 64);
+//         RawHID.send(send, HID_TIMEOUT_MAX);
 //       }
 //       if (cmd == HID_REQUESTS::R_CALIB_T)
 //       {
 //         machineState = MACHINE_STATE::R_CALIB_T;
 //         send[2]      = (byte)machineState;
-//         RawHID.send(send, 64);
+//         RawHID.send(send, HID_TIMEOUT_MAX);
 //         // calibrateTouch();
 //       }
 //     }
@@ -298,7 +300,7 @@ MACHINE_STATE parseRequests(HID_REQ* req)
 //       send[1]      = (byte)HID_REQUESTS::ERR_NOCMD;
 //       machineState = MACHINE_STATE::S_IDLE;
 //       send[2]      = (byte)machineState;
-//       RawHID.send(send, 64);
+//       RawHID.send(send, HID_TIMEOUT_MAX);
 //     }
 
 //     break;
@@ -309,13 +311,13 @@ MACHINE_STATE parseRequests(HID_REQ* req)
 //       send[1]      = (byte)cmd;
 //       machineState = MACHINE_STATE::S_MEAS;
 //       send[2]      = (byte)machineState;
-//       RawHID.send(send, 64);
+//       RawHID.send(send, HID_TIMEOUT_MAX);
 //     }
 //     else
 //     {
 //       send[1] = (byte)HID_REQUESTS::ERR_NOCMD;
 //       send[2] = (byte)machineState;
-//       RawHID.send(send, 64);
+//       RawHID.send(send, HID_TIMEOUT_MAX);
 //     }
 //     break;
 
@@ -324,13 +326,13 @@ MACHINE_STATE parseRequests(HID_REQ* req)
 //     {
 //       send[1] = (byte)cmd;
 //       send[2] = (byte)machineState;
-//       RawHID.send(send, 64);
+//       RawHID.send(send, HID_TIMEOUT_MAX);
 //     }
 //     else
 //     {
 //       send[1] = (byte)HID_REQUESTS::ERR_NOCMD;
 //       send[2] = (byte)machineState;
-//       RawHID.send(send, 64);
+//       RawHID.send(send, HID_TIMEOUT_MAX);
 //     }
 
 //   case HID_REQUESTS::R_VIEW:
@@ -350,13 +352,13 @@ MACHINE_STATE parseRequests(HID_REQ* req)
 //       send[12] = (byte)((Estr->touchThresh.avg >> 8) & 0xff);
 //       send[13] = (byte)(Estr->touchThresh.avg & 0xff);
 //       send[14] = (byte)machineState;
-//       RawHID.send(send, 64);
+//       RawHID.send(send, HID_TIMEOUT_MAX);
 //     }
 //     else
 //     {
 //       send[1] = (byte)HID_REQUESTS::ERR_NOCMD;
 //       send[2] = (byte)machineState;
-//       RawHID.send(send, 64);
+//       RawHID.send(send, HID_TIMEOUT_MAX);
 //     }
 //     break;
 
@@ -364,13 +366,13 @@ MACHINE_STATE parseRequests(HID_REQ* req)
 //     send[1]      = (byte)cmd;
 //     machineState = MACHINE_STATE::S_IDLE;
 //     send[2]      = (byte)machineState;
-//     RawHID.send(send, 64);
+//     RawHID.send(send, HID_TIMEOUT_MAX);
 //     break;
 
 //   default:
 //     send[1] = (byte)HID_REQUESTS::ERR_NOCMD;
 //     send[2] = (byte)machineState;
-//     RawHID.send(send, 64);
+//     RawHID.send(send, HID_TIMEOUT_MAX);
 //     break;
 // }
 // }

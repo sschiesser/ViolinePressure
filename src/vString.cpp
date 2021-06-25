@@ -338,10 +338,13 @@ bool vString::calibrate(CALIB_TYPE type, ADC_Module* module, range_t* range, thr
  *****************************************************************************/
 uint16_t vString::measure(ADC_Module* module, uint8_t smoothing)
 {
-  if (touchRead(touchPin) > (int)(1.1 * (float)touchThresh.min))
-    return module->analogRead(adcPin);
-  else
-    return 0;
+  static uint8_t cnt = 0;
+  delayMicroseconds(500);
+  return cnt++;
+  // if (touchRead(touchPin) > (int)(1.1 * (float)touchThresh.min))
+  //   return module->analogRead(adcPin);
+  // else
+  //   return 0;
 }
 
 // void vString::displayRange(range_t* range)

@@ -6,7 +6,7 @@
 #include <Arduino.h>
 #include <usb_rawhid.h>
 
-#define HID_TIMEOUT_MAX 50
+#define HID_TIMEOUT_MAX 1
 #define HID_PACK_SIZE_MAX 20 // HAVE TO MATCH WITH RX/TX VALUES IN USB_DESC.H
 
 enum class MACHINE_STATE : uint8_t {
