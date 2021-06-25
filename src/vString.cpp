@@ -1,5 +1,5 @@
 #include "vString.h"
-#include "main.h"
+// #include "main.h"
 
 /******************************************************************************
  * vString::vString
@@ -15,6 +15,7 @@ vString::vString(uint8_t tPin, uint8_t aPin, char strName, uint8_t strNumber)
   adcRange.max = 0;
   adcCalDone   = false;
   adcNewVal    = false;
+  adcVal       = 0;
   pinMode(adcPin, INPUT);
 
   touchPin        = tPin;
@@ -171,10 +172,10 @@ void vString::getFromEeprom(CALIB_TYPE type)
  * 
  * Parameters:
  * - type     ->  calibration type: CALIB_RANGE (min/max of ADC conversion) and
- *                CALIB_TOUCH (min/max/avg of string capacitive touch threshold)
+ *                R_CALIB_T (min/max/avg of string capacitive touch threshold)
  * - *module  ->  ADC module to work with
  * - *range   ->  min/max struct to save CALIB_RANGE values
- * - *thresh  ->  min/max/avg struct to save CALIB_TOUCH values
+ * - *thresh  ->  min/max/avg struct to save R_CALIB_T values
  * 
  * Return:
  * - bool     ->  calibration values are in an acceptable range
@@ -201,21 +202,23 @@ bool vString::calibrate(CALIB_TYPE type, ADC_Module* module, range_t* range, thr
       range->max = 0;
       while (doCal)
       {
-        while (touchRead(touchPin) > touchThresh.avg)
+        while (touchRead(touchPin) > (1.1 * thresh->min))
         {
           uint16_t val = module->analogRead(adcPin);
           if (val > range->max) range->max = val;
           if (val < range->min) range->min = val;
 
-          send[0] = (uint8_t)HID_NOTIFICATIONS::CALIB_RANGES;
-          send[1] = 6;
-          send[2] = ((range->min >> 8) & 0xff);
-          send[3] = (range->min) & 0xff;
-          send[4] = ((range->max >> 8) & 0xff);
-          send[5] = (range->max) & 0xff;
-          send[6] = (uint8_t)MACHINE_STATE::CALIB_RANGES;
-          send[7] = (uint8_t)HID_NOTIFICATIONS::END;
-          RawHID.send(send, 64);
+          send[0] = (uint8_t)HID_NOTIF::N_INFO;
+          send[1] = 8;
+          send[2] = (uint8_t)HID_NOTIF::N_CALIB_R;
+          send[3] = number;
+          send[4] = ((range->min >> 8) & 0xff);
+          send[5] = (range->min) & 0xff;
+          send[6] = ((range->max >> 8) & 0xff);
+          send[7] = (range->max) & 0xff;
+          send[8] = (uint8_t)MACHINE_STATE::S_CALIB_R;
+          send[9] = (uint8_t)HID_NOTIF::N_END;
+          RawHID.send(send, HID_TIMEOUT_MAX);
 
           delta = 0;
         } // while(touchRead())
@@ -228,22 +231,29 @@ bool vString::calibrate(CALIB_TYPE type, ADC_Module* module, range_t* range, thr
 
       retVal = checkCalStatus(CALIB_TYPE::CALIB_RANGE);
 
-      send[0] = (uint8_t)HID_NOTIFICATIONS::CALIB_RANGES_DONE;
-      send[1] = 8;
-      send[2] = number;
-      send[3] = ((range->min >> 8) & 0xff);
-      send[4] = (range->min & 0xff);
-      send[5] = ((range->max >> 8) & 0xff);
-      send[6] = (range->max & 0xff);
-      send[7] = retVal;
-      send[8] = (uint8_t)MACHINE_STATE::CALIB_RANGES;
-      send[9] = (uint8_t)HID_NOTIFICATIONS::END;
-      RawHID.send(send, 64);
+      send[0] = (uint8_t)HID_NOTIF::N_INFO;
+      send[1] = 3;
+      send[2] = (uint8_t)HID_NOTIF::N_TIMEOUT;
+      send[3] = (uint8_t)MACHINE_STATE::S_CALIB_R;
+      send[4] = (uint8_t)HID_NOTIF::N_END;
+      RawHID.send(send, HID_TIMEOUT_MAX);
+
+      // send[0] = (uint8_t)HID_NOTIF::N_INFO;
+      // send[1] = 8;
+      // send[2] = (uint8_t)HID_NOTIF::N_CALIB_R;
+      // send[3] = number;
+      // send[4] = ((range->min >> 8) & 0xff);
+      // send[5] = (range->min) & 0xff;
+      // send[6] = ((range->max >> 8) & 0xff);
+      // send[7] = (range->max) & 0xff;
+      // send[8] = (uint8_t)MACHINE_STATE::S_CALIB_R;
+      // send[9] = (uint8_t)HID_NOTIF::N_END;
+      // RawHID.send(send, HID_TIMEOUT_MAX);
 
       break;
     }
 
-    /* CALIB_TYPE::CALIB_TOUCH
+    /* CALIB_TYPE::R_CALIB_T
      * -  Read & average capacitive value on the given string, determine
      *    min/max values and send notification.
      * -  If 'x' (EXIT) is received, stop reading, calculate the average
@@ -261,50 +271,48 @@ bool vString::calibrate(CALIB_TYPE type, ADC_Module* module, range_t* range, thr
           touchBuf[i] = touchRead(touchPin);
           sum += touchBuf[i];
         }
-        uint16_t avg = (uint16_t)(sum / 50);
-        if (avg > thresh->max) thresh->max = avg;
-        if (avg < thresh->min) thresh->min = avg;
+        uint16_t temp = (uint16_t)(sum / 50);
+        if (temp > thresh->max) thresh->max = temp;
+        if (temp < thresh->min) thresh->min = temp;
+        thresh->avg = thresh->min + ((thresh->max - thresh->min) / 2);
 
-        send[0] = (uint8_t)HID_NOTIFICATIONS::CALIB_TOUCH;
-        send[1] = 6;
-        send[2] = ((thresh->min >> 8) & 0xff);
-        send[3] = (thresh->min & 0xff);
-        send[4] = ((thresh->max >> 8) & 0xff);
-        send[5] = (thresh->max & 0xff);
-        send[6] = (uint8_t)MACHINE_STATE::CALIB_TOUCH;
-        send[7] = (uint8_t)HID_NOTIFICATIONS::END;
-        RawHID.send(send, 64);
+        send[0]  = (uint8_t)HID_NOTIF::N_INFO;
+        send[1]  = 10;
+        send[2]  = (uint8_t)HID_NOTIF::N_CALIB_T;
+        send[3]  = number;
+        send[4]  = ((thresh->min >> 8) & 0xff);
+        send[5]  = (thresh->min & 0xff);
+        send[6]  = ((thresh->max >> 8) & 0xff);
+        send[7]  = (thresh->max & 0xff);
+        send[8]  = ((thresh->avg >> 8) & 0xff);
+        send[9]  = (thresh->avg & 0xff);
+        send[10] = (uint8_t)MACHINE_STATE::S_CALIB_T;
+        send[11] = (uint8_t)HID_NOTIF::N_END;
+        RawHID.send(send, HID_TIMEOUT_MAX);
 
         uint8_t n = RawHID.recv(recv, 0);
         if (n > 0)
         {
           uint8_t len = recv[1];
           uint8_t pos = recv[1] + 1;
-          if ((recv[0] == (uint8_t)HID_REQUESTS::REQUEST) &&
-              (recv[pos] == (uint8_t)HID_REQUESTS::END) &&
-              (recv[2] == (uint8_t)HID_REQUESTS::EXIT) &&
+          if ((recv[0] == (uint8_t)HID_REQ::R_CMD) &&
+              (recv[pos] == (uint8_t)HID_REQ::R_END) &&
+              (recv[2] == (uint8_t)HID_REQ::R_EXIT) &&
               len > 0)
           {
             doCal       = false;
-            thresh->avg = (thresh->max + thresh->min) / 2;
+            thresh->avg = thresh->min + ((thresh->max + thresh->min) / 2);
             retVal      = checkCalStatus(CALIB_TYPE::CALIB_TOUCH);
           }
         }
       } // while(doCal)
 
-      send[0]  = (uint8_t)HID_NOTIFICATIONS::CALIB_TOUCH_DONE;
-      send[1]  = 10;
-      send[2]  = number;
-      send[3]  = ((thresh->min >> 8) & 0xff);
-      send[4]  = (thresh->min & 0xff);
-      send[5]  = ((thresh->max >> 8) & 0xff);
-      send[6]  = (thresh->max & 0xff);
-      send[7]  = ((thresh->avg >> 8) & 0xff);
-      send[8]  = (thresh->avg & 0xff);
-      send[9]  = retVal;
-      send[10] = (uint8_t)MACHINE_STATE::CALIB_TOUCH_E;
-      send[11] = (uint8_t)HID_NOTIFICATIONS::END;
-      RawHID.send(send, 64);
+      send[0] = (uint8_t)HID_NOTIF::N_INFO;
+      send[1] = 3;
+      send[2] = (uint8_t)HID_NOTIF::N_EXIT;
+      send[3] = (uint8_t)MACHINE_STATE::S_CALIB_T;
+      send[4] = (uint8_t)HID_NOTIF::N_END;
+      RawHID.send(send, HID_TIMEOUT_MAX);
       break;
     }
 

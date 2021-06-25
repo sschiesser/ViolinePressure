@@ -1,11 +1,19 @@
 #ifndef VSTRING_H
 #define VSTRING_H
 
-// #include "main.h"
+#include "main.h"
 #include <ADC.h>
 #include <Arduino.h>
 #include <EEPROM.h>
 #include <usb_rawhid.h>
+
+#define ESTR_TOUCH_PIN 1
+#define ESTR_ADC_PIN A1
+#define ESTR_NAME_CHAR 'E'
+
+#define GSTR_TOUCH_PIN 0
+#define GSTR_ADC_PIN A0
+#define GSTR_NAME_CHAR 'G'
 
 #define BUFFER_SIZE UINT8_MAX
 #define EEPROM_RANGE_ADDR 0
@@ -37,21 +45,18 @@ class vString
   public:
   char name;
   uint8_t number;
-  bool adcNewVal;
-  const uint16_t bufSize = BUFFER_SIZE;
 
   uint8_t adcPin;
   range_t adcRange;
   bool adcCalDone;
-  // uint16_t adcBuf[BUFFER_SIZE];
-  // uint16_t bufHead, bufTail;
-  // uint16_t adcCurVal;
-  // uint16_t adcDispValue;
+  bool adcNewVal;
+  uint16_t adcVal;
+  // const uint16_t bufSize = BUFFER_SIZE;
 
   uint8_t touchPin;
-  uint16_t touchBuf[BUFFER_SIZE];
   thresh_t touchThresh;
   bool touchCalDone;
+  uint16_t touchBuf[BUFFER_SIZE];
 
   vString(uint8_t touchPin, uint8_t adcPin, char strName, uint8_t strNumber);
   ~vString();

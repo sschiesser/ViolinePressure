@@ -1,64 +1,27 @@
 #ifndef INIT_H
 #define INIT_H
 
+#include "messages.h"
 #include "vString.h"
 #include <Arduino.h>
 #include <usb_rawhid.h>
 
-enum class HID_REQUESTS : uint8_t {
-  // request type headers (< 0x20)
-  REQUEST = 0x10,
-  // requests values (0x20 <= val <= 0x7E)
-  STRING_A     = 'a',
-  STRING_D     = 'd',
-  STRING_E     = 'e',
-  STRING_G     = 'g',
-  STRING_NONE  = 0xe0,
-  HELP         = 'h',
-  MEASURE      = 'm',
-  CALIB_RANGES = 'r',
-  CALIB_TOUCH  = 't',
-  VIEW         = 'v',
-  EXIT         = 'x',
-  // request end delimiter
-  END = 0xFF,
-};
-
-enum class HID_NOTIFICATIONS : uint8_t {
-  // notification type headers
-  MEASUREMENT     = 0x00,
-  ACKNOWLEDGEMENT = 0x10,
-  // notification values
-  CALIB_RANGES      = 0x20,
-  CALIB_RANGES_DONE = 0x21,
-  CALIB_TOUCH       = 0x30,
-  CALIB_TOUCH_DONE  = 0x31,
-  MEASURE_REQ       = 0x40,
-  VIEW_VALUES       = 0x50,
-  EXIT_REQ          = 0x60,
-  STRING_E          = 0xC0,
-  STRING_G          = 0xC1,
-  STRING_D          = 0xC2,
-  STRING_A          = 0xC3,
-  ERROR_BADCMD      = 0xE0,
-  ERROR_TIMEOUT     = 0xE1,
-  // notification end delimiter
-  END = 0xFF
-};
+#define HID_TIMEOUT_MAX 1
+#define HID_PACK_SIZE_MAX 20 // MUST BE <= THAN RX/TX VALUES IN USB_DESC.H
 
 enum class MACHINE_STATE : uint8_t {
-  IDLE           = 0x00,
-  CALIB_RANGES   = 0x10,
-  CALIB_RANGES_G = 0x11,
-  CALIB_RANGES_E = 0x12,
-  CALIB_TOUCH    = 0x20,
-  CALIB_TOUCH_G  = 0x21,
-  CALIB_TOUCH_E  = 0x22,
-  MEASURING      = 0x50,
-  ERROR          = 0xE0
+  S_IDLE    = 0x00,
+  S_CALIB_R = 0x10,
+  S_CR_G    = 0x11,
+  S_CR_E    = 0x12,
+  S_CALIB_T = 0x20,
+  S_CT_G    = 0x21,
+  S_CT_E    = 0x22,
+  S_MEAS    = 0x50,
+  S_ERR     = 0xE0
 };
 
-MACHINE_STATE parseRequests(HID_REQUESTS* req);
+MACHINE_STATE parseRequests(HID_REQ* req);
 // void calibrateRange(vString* str);
 // void calibrateTouch(vString* str);
 // bool doCalibrate(uint8_t adcPin, uint8_t touchPin, range_t* range);
