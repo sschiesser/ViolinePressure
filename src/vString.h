@@ -7,6 +7,14 @@
 #include <EEPROM.h>
 #include <usb_rawhid.h>
 
+#define ESTR_TOUCH_PIN 1
+#define ESTR_ADC_PIN A1
+#define ESTR_NAME_CHAR 'E'
+
+#define GSTR_TOUCH_PIN 0
+#define GSTR_ADC_PIN A0
+#define GSTR_NAME_CHAR 'G'
+
 #define BUFFER_SIZE UINT8_MAX
 #define EEPROM_RANGE_ADDR 0
 #define EEPROM_TOUCH_ADDR 8
@@ -37,18 +45,18 @@ class vString
   public:
   char name;
   uint8_t number;
-  bool adcNewVal;
-  const uint16_t bufSize = BUFFER_SIZE;
 
   uint8_t adcPin;
   range_t adcRange;
   bool adcCalDone;
-
+  bool adcNewVal;
+  uint16_t adcVal;
+  // const uint16_t bufSize = BUFFER_SIZE;
 
   uint8_t touchPin;
-  uint16_t touchBuf[BUFFER_SIZE];
   thresh_t touchThresh;
   bool touchCalDone;
+  uint16_t touchBuf[BUFFER_SIZE];
 
   vString(uint8_t touchPin, uint8_t adcPin, char strName, uint8_t strNumber);
   ~vString();
