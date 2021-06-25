@@ -5,14 +5,11 @@
 #include <Arduino.h>
 #include <EEPROM.h>
 
-// elapsedMillis gDetla, eDelta;
 elapsedMillis deltaMs;
 elapsedMicros deltaUs;
 ADC* adc      = new ADC(); // adc object;
 vString* Gstr = new vString(GSTR_TOUCH_PIN, GSTR_ADC_PIN, GSTR_NAME_CHAR, (uint8_t)HID_NOTIF::N_STR_G);
 vString* Estr = new vString(ESTR_TOUCH_PIN, ESTR_ADC_PIN, ESTR_NAME_CHAR, (uint8_t)HID_NOTIF::N_STR_E);
-// uint8_t buffer[64];
-// uint32_t start;
 
 MACHINE_STATE machineState = MACHINE_STATE::S_IDLE;
 
@@ -21,13 +18,10 @@ void setup()
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
 
-  // Serial.begin(115200);
-  // delay(1000);
-
-  adc->adc0->setAveraging(128);                                        // set number of averages
-  adc->adc0->setResolution(16);                                        // set bits of resolution
-  adc->adc0->setConversionSpeed(ADC_CONVERSION_SPEED::VERY_LOW_SPEED); // change the conversion speed
-  adc->adc0->setSamplingSpeed(ADC_SAMPLING_SPEED::VERY_LOW_SPEED);     // change the sampling speed
+  adc->adc0->setAveraging(16);                                            // set number of averages
+  adc->adc0->setResolution(16);                                           // set bits of resolution
+  adc->adc0->setConversionSpeed(ADC_CONVERSION_SPEED::HIGH_SPEED_16BITS); // change the conversion speed
+  adc->adc0->setSamplingSpeed(ADC_SAMPLING_SPEED::HIGH_SPEED);            // change the sampling speed
 }
 
 void loop()
@@ -84,13 +78,13 @@ void loop()
     }
 
     case MACHINE_STATE::S_MEAS: {
-      if ((Gstr->adcNewVal) || (Estr->adcNewVal))
+      if ((Gstr->adcNewVal) && (Estr->adcNewVal))
       {
         gVal            = Gstr->adcVal;
         eVal            = Estr->adcVal;
         Gstr->adcNewVal = false;
         Estr->adcNewVal = false;
-        if (deltaUs > 1000)
+        if (deltaUs > 10)
         {
           notif[0] = (uint8_t)HID_NOTIF::N_MEAS;
           notif[1] = 8;
@@ -106,8 +100,6 @@ void loop()
           deltaUs = 0;
           deltaMs = 0;
         }
-
-        // delayMicroseconds(1);
       }
       break;
     }
@@ -163,8 +155,7 @@ MACHINE_STATE parseRequests(HID_REQ* req)
         notif[4] = (uint8_t)HID_NOTIF::N_END;
 
         adc->adc0->enableInterrupts(adc0_isr);
-        adc->adc0->startContinuous(Gstr->adcPin);
-        adc->adc0->startContinuous(Estr->adcPin);
+        adc->adc0->startSingleRead(Estr->adcPin);
 
         retVal  = MACHINE_STATE::S_MEAS;
         deltaUs = 0;
@@ -234,7 +225,7 @@ MACHINE_STATE parseRequests(HID_REQ* req)
         if (machineState == MACHINE_STATE::S_MEAS)
         {
           adc->adc0->disableInterrupts();
-          adc->adc0->stopContinuous();
+          // adc->adc0->stopContinuous();
         }
 
         retVal = MACHINE_STATE::S_IDLE;
@@ -256,28 +247,33 @@ MACHINE_STATE parseRequests(HID_REQ* req)
   return retVal;
 }
 
-// If you enable interrupts make sure to call readSingle() to clear the interrupt.
+/* ****************************************************************************
+ * void adc0_isr
+ * ----------------------------------------------------------------------------
+ * !!! MAKE SURE TO CALL readSingle() TO CLEAR THE INTERRUPT !!!
+ * 
+ * Check on which pin the ADC channel was set and set the corresponding
+ * value & flag. Then start a new singleRead on a next pin.
+ * ****************************************************************************/
 void adc0_isr()
 {
-  uint8_t pin = ADC::sc1a2channelADC0[ADC0_SC1A & ADC_SC1A_CHANNELS];
+  uint16_t val = adc->adc0->readSingle();
+  uint8_t pin  = ADC::sc1a2channelADC0[ADC0_SC1A & ADC_SC1A_CHANNELS];
   if (pin == Estr->adcPin)
   {
-    Estr->adcVal    = adc->adc0->readSingle();
+    Estr->adcVal    = val;
     Estr->adcNewVal = true;
+    adc->adc0->startSingleRead(Gstr->adcPin);
   }
   else if (pin == Gstr->adcPin)
   {
-    Gstr->adcVal    = adc->adc0->analogReadContinuous();
+    Gstr->adcVal    = val;
     Gstr->adcNewVal = true;
-  }
-  else
-  {
-    adc->readSingle();
+    adc->adc0->startSingleRead(Estr->adcPin);
   }
 
   if (adc->adc0->adcWasInUse)
   {
-    // Serial.println("In use");
     adc->adc0->loadConfig(&adc->adc0->adc_config);
     adc->adc0->adcWasInUse = false;
   }
